@@ -1,0 +1,17 @@
+{
+  "extends": "next/core-web-vitals",
+  "env": {
+    "node": true
+  },
+  "overrides": [
+    {
+      "files": ["*.config.js", "*.config.ts"],
+      "env": {
+        "node": true
+      },
+      "rules": {
+        "no-undef": "off"
+      }
+    }
+  ]
+}
