@@ -5,7 +5,7 @@ import {
   POWERUP_CONFIG,
 } from "./config";
 import type { GridPosition } from "../types/game";
-import { createDynamite } from "./items";
+import { createDynamite } from "./dynamite";
 import { createPowerUp, hasPowerup, PowerupType } from "./powerup";
 import { tracker } from "./tracker";
 import { playSound } from "./sound";
