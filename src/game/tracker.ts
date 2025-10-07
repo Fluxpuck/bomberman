@@ -1,5 +1,5 @@
 import { PLAYER_CONFIG, BOMB_CONFIG, SCORE_CONFIG } from "./config";
-import { Character, Player, Computer } from "./_player";
+import { Character, Player, Computer } from "./player";
 import { GridPosition, Position } from "../types/game";
 
 // =========================

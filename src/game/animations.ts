@@ -6,9 +6,9 @@ import {
 } from "./config";
 import type { GridPosition } from "../types/game";
 import { createDynamite } from "./items";
-import { createPowerUp, hasPowerup, PowerupType } from "./_powerup";
-import { tracker } from "./_tracker";
-import { playSound } from "./_sound";
+import { createPowerUp, hasPowerup, PowerupType } from "./powerup";
+import { tracker } from "./tracker";
+import { playSound } from "./sound";
 
 // =========================
 // Grid helpers

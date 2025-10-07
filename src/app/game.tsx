@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { grid, updateGridLayout } from "../game/_grid";
-import { Player, characterManager } from "../game/_player";
+import { grid, updateGridLayout } from "../game/grid";
+import { Player, characterManager } from "../game/player";
 import { GRID_PATTERN } from "../game/config";
 import { GameMode } from "../types/game";
 

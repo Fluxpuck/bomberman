@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { resetGrid } from "../game/_grid";
+import { resetGrid } from "../game/grid";
 import {
   initializePlayers,
   startEngine,
@@ -9,8 +9,8 @@ import {
   setOnPlayerDead,
   setOnTimeOver,
   getGameState,
-} from "../game/_engine";
-import { tracker } from "../game/_tracker";
+} from "../game/engine";
+import { tracker } from "../game/tracker";
 import { GameHUD } from "../components/screens/gameHud";
 import { StartScreen } from "../components/screens/startScreen";
 import { EndScreen } from "../components/screens/endScreen";

@@ -1,9 +1,9 @@
-import { getCellAt } from "./_grid";
-import { Character } from "./_player";
-import { tracker } from "./_tracker";
+import { getCellAt } from "./grid";
+import { Character } from "./player";
+import { tracker } from "./tracker";
 import { GridPosition } from "../types/game";
 import { POWERUP_CONFIG } from "./config";
-import { playSound } from "./_sound";
+import { playSound } from "./sound";
 
 // Types of powerups
 export type PowerupType = "extraBomb" | "increaseRange";

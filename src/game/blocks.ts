@@ -1,4 +1,4 @@
-import { cellSize } from "./_grid";
+import { cellSize } from "./grid";
 
 /**
  * Creates a solid block element sized to fit within a cell

@@ -1,5 +1,5 @@
 import React from "react";
-import { GameStats, PlayerStats } from "../../game/_tracker";
+import { GameStats, PlayerStats } from "../../game/tracker";
 import { GameState } from "../../types/game";
 
 export interface EndScreenProps {

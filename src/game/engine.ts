@@ -1,9 +1,9 @@
 import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./config";
-import { grid, isWalkable, getCellAt, gridRows, gridCols } from "./_grid";
-import { Character, Player, Computer, characterManager } from "./_player";
-import { tracker } from "./_tracker";
-import { armDynamite } from "./_animations";
-import { checkPowerupPickup } from "./_powerup";
+import { grid, isWalkable, getCellAt, gridRows, gridCols } from "./grid";
+import { Character, Player, Computer, characterManager } from "./player";
+import { tracker } from "./tracker";
+import { armDynamite } from "./animations";
+import { checkPowerupPickup } from "./powerup";
 import { Direction, GridPosition, Position, GameState } from "../types/game";
 
 // =========================
