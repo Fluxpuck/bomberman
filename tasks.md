@@ -2,6 +2,6 @@
 - [ ] Add powerup sound
 - [ ] Improve powerup item design
 - [ ] Improve character design
-- [ ] Improve character damage animation
+- [x] Improve character damage animation
 - [ ] Add NPCs
 - [ ] Add AI logic and tactics

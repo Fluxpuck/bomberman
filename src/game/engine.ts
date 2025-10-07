@@ -447,6 +447,9 @@ function checkBlastCellDamage(character: Character): void {
       if (playerTracker) {
         // Apply damage
         playerTracker.decrementLife();
+        
+        // Character's takeDamage method will start the damage animation
+        character.takeDamage();
 
         // Set player immune after taking damage
         character.setImmune();

@@ -98,19 +98,29 @@ export default function Game({ mode }: GameProps) {
         return "#333";
       };
 
-      const borderColor = darkenColor(char.color);
+      // Check if character is showing damage animation
+      const isShowingDamage = char.isShowingDamageAnimation();
+
+      // Apply flashing red effect if showing damage - using softer red tones
+      const backgroundColor = isShowingDamage ? "#e74c3c" : char.color;
+      const borderColor = isShowingDamage ? "#c0392b" : darkenColor(char.color);
+      const boxShadowColor = isShowingDamage
+        ? "rgba(231, 76, 60, 0.5)"
+        : borderColor;
 
       Object.assign(charElement.style, {
         position: "absolute",
         width: `${charSize}px`,
         height: `${charSize}px`,
-        backgroundColor: char.color,
+        backgroundColor: backgroundColor,
         borderRadius: "15%",
         border: `3px solid ${borderColor}`,
-        boxShadow: `0 2px 4px ${borderColor}`,
+        boxShadow: isShowingDamage
+          ? `0 0 6px 3px ${boxShadowColor}`
+          : `0 2px 4px ${boxShadowColor}`,
         left: `${char.position.x + (cellSize - charSize) / 2}px`,
         top: `${char.position.y + (cellSize - charSize) / 2}px`,
-        transition: "all 0.5s ease",
+        transition: isShowingDamage ? "none" : "all 0.5s ease",
         zIndex: "10",
         display: "flex",
         alignItems: "center",

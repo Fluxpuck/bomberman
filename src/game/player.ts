@@ -8,6 +8,10 @@ export abstract class Character {
   // Damage cooldown tracking
   private _damageCooldownEndTime: number = 0;
   private static readonly DAMAGE_COOLDOWN_MS: number = 500; // How long a player is immune after taking damage
+  
+  // Damage animation tracking
+  private _damageAnimationEndTime: number = 0;
+  private static readonly DAMAGE_ANIMATION_MS: number = 250; // Shorter duration for a more subtle effect
 
   constructor(
     public id: string,
@@ -36,6 +40,21 @@ export abstract class Character {
 
   public takeDamage(): void {
     this.lives = Math.max(0, this.lives - 1);
+    this.startDamageAnimation();
+  }
+  
+  /**
+   * Start the damage animation
+   */
+  private startDamageAnimation(): void {
+    this._damageAnimationEndTime = Date.now() + Character.DAMAGE_ANIMATION_MS;
+  }
+  
+  /**
+   * Check if the character is currently showing damage animation
+   */
+  public isShowingDamageAnimation(): boolean {
+    return Date.now() < this._damageAnimationEndTime;
   }
 
   public isAlive(): boolean {
