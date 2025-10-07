@@ -6,6 +6,7 @@ import {
 } from "./config";
 import { tracker } from "./_tracker";
 import { playSound } from "./_sound";
+import { createPowerUp, hasPowerup, PowerupType } from "./_powerup";
 import type { GridPosition } from "../types/game";
 
 // =========================
@@ -44,49 +45,7 @@ function getCellFlags(grid: HTMLElement, row: number, col: number) {
 // =========================
 // Factories
 // =========================
-/**
- * Creates a power-up element
- */
-export function createPowerUp(type: "bomb" | "range"): HTMLDivElement {
-  const el = document.createElement("div");
-
-  const colors = {
-    bomb: { bg: "#3b82f6", border: "#1d4ed8" },
-    range: { bg: "#ef4444", border: "#b91c1c" },
-  };
-
-  Object.assign(el.style, {
-    width: "60%",
-    height: "60%",
-    margin: "20%",
-    background: colors[type].bg,
-    border: `2px solid ${colors[type].border}`,
-    borderRadius: "4px",
-    position: "relative",
-    boxSizing: "border-box",
-  });
-
-  // Tag for identification
-  el.dataset.powerup = type;
-
-  // Add a label
-  const label = document.createElement("div");
-  Object.assign(label.style, {
-    position: "absolute",
-    inset: "0",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "14px",
-    fontWeight: "bold",
-    color: "#fff",
-  });
-
-  label.textContent = type === "bomb" ? "+" : "R+";
-  el.appendChild(label);
-
-  return el;
-}
+// Power-up creation has been moved to _powerup.ts
 
 /**
  * Creates a dynamite element sized to fit within a cell
@@ -182,15 +141,8 @@ export function armDynamite(
   // Can't place inside walls/solids (allow placing on open tiles only)
   // Exception: allow placing on a power-up so players can bomb while standing on it
   const here = getCellFlags(grid, at.row, at.col);
-  const hasPowerup = (() => {
-    if (!here.cell) return false;
-    for (const ch of Array.from(here.cell.children)) {
-      const d = (ch as HTMLElement).dataset as any;
-      if (d && d.powerup) return true;
-    }
-    return false;
-  })();
-  if (here.solid && !here.barrel && !hasPowerup) return;
+  const powerupPresent = hasPowerup(here.cell);
+  if (here.solid && !here.barrel && !powerupPresent) return;
 
   // Create the dynamite element
   const dyn = createDynamite();
@@ -234,13 +186,13 @@ export function armDynamite(
         const r = at.row + dr * step;
         const c = at.col + dc * step;
         const flags = getCellFlags(grid, r, c);
-        
+
         // Stop if we hit the edge of the grid
         if (!flags.exists) break;
-        
+
         // Add this cell to affected cells
         affected.push({ row: r, col: c });
-        
+
         // Stop if we hit a solid wall or barrel
         // (but we include the cell in the affected list for visual effects)
         if (flags.solid) {
@@ -271,7 +223,7 @@ export function armDynamite(
     for (const gp of affected) {
       const target = getCell(grid, gp.row, gp.col);
       if (!target) continue;
-      
+
       // Skip solid walls (but not barrels which are also marked as solid)
       const isBarrel = (target.dataset as any).barrel === "1";
       const isSolid = target.dataset.solid === "1";
@@ -305,7 +257,7 @@ export function armDynamite(
           Math.min(1, POWERUP_CONFIG.dropChance ?? 0)
         );
         if (Math.random() < dropChance) {
-          const types = ["bomb", "range"] as const;
+          const types = ["extraBomb", "increaseRange"] as PowerupType[];
           const t = types[Math.floor(Math.random() * types.length)];
           const pu = createPowerUp(t);
           target.appendChild(pu);

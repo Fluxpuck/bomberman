@@ -1,14 +1,9 @@
-import {
-  GAME_CONFIG,
-  GRID_PATTERN,
-  PLAYER_CONFIG,
-  BOMB_CONFIG,
-  SCORE_CONFIG,
-} from "./config";
+import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./config";
 import { grid, isWalkable, getCellAt, gridRows, gridCols } from "./_grid";
 import { Character, Player, Computer, characterManager } from "./_player";
 import { tracker } from "./_tracker";
 import { armDynamite } from "./_animations";
+import { checkPowerupPickup } from "./_powerup";
 import { Direction, GridPosition, Position, GameState } from "../types/game";
 
 // =========================
@@ -202,7 +197,7 @@ function moveCharacter(character: Character, direction: Direction): boolean {
 
   // Check if the character moved into a blast cell
   checkBlastCellDamage(character);
-  
+
   // Check if the character moved onto a powerup
   checkPowerupPickup(character);
 
@@ -428,7 +423,7 @@ function updateComputerPlayers(deltaTime: number) {
 function checkBlastCellDamage(character: Character): void {
   // Skip if character is not alive
   if (!character.isAlive()) return;
-  
+
   // Skip if character is immune
   if (character.isImmune()) return;
 
@@ -452,7 +447,7 @@ function checkBlastCellDamage(character: Character): void {
       if (playerTracker) {
         // Apply damage
         playerTracker.decrementLife();
-        
+
         // Set player immune after taking damage
         character.setImmune();
 

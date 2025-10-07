@@ -1,5 +1,6 @@
 import { BOMB_CONFIG, SCORE_CONFIG, POWERUP_CONFIG } from "./config";
 import { tracker } from "./_tracker";
+import { createPowerUp, hasPowerup } from "./_powerup";
 import { GridPosition } from "../types/game";
 
 // =========================
@@ -80,63 +81,7 @@ export function createBomb(): HTMLDivElement {
   return el;
 }
 
-/**
- * Creates a powerup element
- */
-export function createPowerUp(
-  type: "extraBomb" | "increaseRange"
-): HTMLDivElement {
-  const el = document.createElement("div");
-
-  const colors = {
-    extraBomb: { bg: "#3b82f6", border: "#1d4ed8" },
-    increaseRange: { bg: "#ef4444", border: "#b91c1c" },
-  };
-
-  Object.assign(el.style, {
-    width: "60%",
-    height: "60%",
-    margin: "20%",
-    background: colors[type].bg,
-    border: `2px solid ${colors[type].border}`,
-    borderRadius: "4px",
-    position: "relative",
-    boxSizing: "border-box",
-    opacity: "0.8", // Make powerups semi-transparent
-    zIndex: "5", // Ensure powerups appear above the grid but below characters
-  });
-
-  // Tag for identification
-  el.dataset.powerup = type;
-  // Mark as non-solid so bombs can be placed on top
-  el.dataset.solid = "0";
-
-  // Add a label
-  const label = document.createElement("div");
-  Object.assign(label.style, {
-    position: "absolute",
-    inset: "0",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "14px",
-    fontWeight: "bold",
-    color: "#fff",
-  });
-
-  switch (type) {
-    case "extraBomb":
-      label.textContent = "+";
-      break;
-    case "increaseRange":
-      label.textContent = "R+";
-      break;
-  }
-
-  el.appendChild(label);
-
-  return el;
-}
+// Power-up creation has been moved to _powerup.ts
 
 // =========================
 // Effects
@@ -199,15 +144,8 @@ export function placeBomb(
   // Can't place inside walls/solids (allow placing on open tiles only)
   // Exception: allow placing on a power-up so players can bomb while standing on it
   const here = getCellFlags(grid, at.row, at.col, gridRows, gridCols);
-  const hasPowerup = (() => {
-    if (!here.cell) return false;
-    for (const ch of Array.from(here.cell.children)) {
-      const d = (ch as HTMLElement).dataset;
-      if (d && d.powerup) return true;
-    }
-    return false;
-  })();
-  if (here.solid && !here.barrel && !hasPowerup) return;
+  const powerupPresent = hasPowerup(here.cell);
+  if (here.solid && !here.barrel && !powerupPresent) return;
 
   // Create the bomb element
   const bomb = createBomb();
