@@ -1,5 +1,6 @@
 import { Direction, GridPosition, Position } from "../types/game";
 import { PLAYER_CONFIG, BOMB_CONFIG } from "./config";
+import { playSound } from "./sound";
 
 // =========================
 // Base Character Class
@@ -8,7 +9,7 @@ export abstract class Character {
   // Damage cooldown tracking
   private _damageCooldownEndTime: number = 0;
   private static readonly DAMAGE_COOLDOWN_MS: number = 500; // How long a player is immune after taking damage
-  
+
   // Damage animation tracking
   private _damageAnimationEndTime: number = 0;
   private static readonly DAMAGE_ANIMATION_MS: number = 250; // Shorter duration for a more subtle effect
@@ -41,15 +42,18 @@ export abstract class Character {
   public takeDamage(): void {
     this.lives = Math.max(0, this.lives - 1);
     this.startDamageAnimation();
+
+    // Play the grunt sound when hit
+    playSound("grunt", 0.7);
   }
-  
+
   /**
    * Start the damage animation
    */
   private startDamageAnimation(): void {
     this._damageAnimationEndTime = Date.now() + Character.DAMAGE_ANIMATION_MS;
   }
-  
+
   /**
    * Check if the character is currently showing damage animation
    */

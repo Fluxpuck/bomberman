@@ -1,5 +1,5 @@
 - [x] Fix powerup and explosion glitch
-- [ ] Add powerup sound
+- [x] Add powerup sound
 - [ ] Improve powerup item design
 - [ ] Improve character design
 - [x] Improve character damage animation

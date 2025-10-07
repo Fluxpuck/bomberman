@@ -4,6 +4,7 @@ import { Character, Player, Computer, characterManager } from "./player";
 import { tracker } from "./tracker";
 import { armDynamite } from "./animations";
 import { checkPowerupPickup } from "./powerup";
+import { playSound } from "./sound";
 import { Direction, GridPosition, Position, GameState } from "../types/game";
 
 // =========================
@@ -34,9 +35,10 @@ let onBombExplode: ((cells: GridPosition[], playerId: string) => void) | null =
 // Input State
 // =========================
 const keyState: Record<string, boolean> = {};
-const keyProcessed: Record<string, boolean> = {}; // Track which keys have been processed
-let lastBombTime = 0;
-const BOMB_COOLDOWN_MS = 500; // Minimum time between bomb placements
+const keyProcessed: Record<string, boolean> = {};
+
+const lastBombTimeByPlayer: Record<string, number> = {};
+const BOMB_COOLDOWN_MS = 250;
 
 // =========================
 // Helper Functions
@@ -102,16 +104,6 @@ function getCornerSpawn(corner: "tl" | "tr" | "bl" | "br"): GridPosition {
 
   // Fallback to the base position even if not walkable
   return basePos;
-}
-
-/**
- * Check if two players are colliding
- */
-function checkPlayerCollision(p1: Character, p2: Character): boolean {
-  return (
-    p1.gridPosition.row === p2.gridPosition.row &&
-    p1.gridPosition.col === p2.gridPosition.col
-  );
 }
 
 /**
@@ -209,7 +201,10 @@ function moveCharacter(character: Character, direction: Direction): boolean {
  */
 function placeBomb(character: Character): boolean {
   const now = Date.now();
-  if (now - lastBombTime < BOMB_COOLDOWN_MS) {
+  const lastTime = lastBombTimeByPlayer[character.id] || 0;
+
+  // Check if enough time has passed since this player's last bomb placement
+  if (now - lastTime < BOMB_COOLDOWN_MS) {
     return false;
   }
 
@@ -226,7 +221,10 @@ function placeBomb(character: Character): boolean {
 
   // Increment active bombs counter
   playerTracker.incrementActiveBombs();
-  lastBombTime = now;
+  lastBombTimeByPlayer[character.id] = now;
+
+  // Play bomb placement sound
+  playSound("explosion", 0.2);
 
   // Place the bomb on the grid
   armDynamite(grid, character.gridPosition, {
@@ -447,7 +445,7 @@ function checkBlastCellDamage(character: Character): void {
       if (playerTracker) {
         // Apply damage
         playerTracker.decrementLife();
-        
+
         // Character's takeDamage method will start the damage animation
         character.takeDamage();
 
