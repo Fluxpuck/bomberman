@@ -25,7 +25,7 @@ export function createPowerUp(type: PowerupType): HTMLDivElement {
     margin: "20%",
     background: colors[type].bg,
     border: `2px solid ${colors[type].border}`,
-    borderRadius: "4px",
+    borderRadius: "50%",
     position: "relative",
     boxSizing: "border-box",
     opacity: "0.8", // Make powerups semi-transparent
