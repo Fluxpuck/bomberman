@@ -2,7 +2,6 @@ import { getCellAt } from "./grid";
 import { Character } from "./player";
 import { tracker } from "./tracker";
 import { GridPosition } from "../types/game";
-import { POWERUP_CONFIG } from "./config";
 import { playSound } from "./sound";
 
 // Types of powerups
@@ -34,6 +33,7 @@ export function createPowerUp(type: PowerupType): HTMLDivElement {
     zIndex: "5",
     pointerEvents: "auto",
     mixBlendMode: "multiply",
+    boxShadow: `0 0 4px 1px ${colors[type].border}`, // Small shadow in border color
   });
 
   // Tag for identification
