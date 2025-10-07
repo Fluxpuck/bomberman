@@ -26,15 +26,19 @@ export function createPowerUp(type: PowerupType): HTMLDivElement {
     background: colors[type].bg,
     border: `2px solid ${colors[type].border}`,
     borderRadius: "50%",
-    position: "relative",
+    position: "absolute",
+    top: "0",
+    left: "0",
     boxSizing: "border-box",
-    opacity: "0.8", // Make powerups semi-transparent
-    zIndex: "5", // Ensure powerups appear above the grid but below characters
+    opacity: "0.8",
+    zIndex: "5",
+    pointerEvents: "auto",
+    mixBlendMode: "multiply",
   });
 
   // Tag for identification
   el.dataset.powerup = type;
-  // Mark as non-solid so bombs can be placed on top
+  // Mark as non-solid so bombs can be placed on top and explosions can pass through
   el.dataset.solid = "0";
 
   // Add a label

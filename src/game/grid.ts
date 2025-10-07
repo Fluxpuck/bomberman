@@ -149,6 +149,7 @@ function createCellElement(cellData: CellData): HTMLDivElement {
     boxSizing: "border-box",
     border: "1px solid #333",
     background: "#fff",
+    position: "relative",
   });
 
   // Set data attributes

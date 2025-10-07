@@ -40,7 +40,8 @@ function getCellFlags(grid: HTMLElement, row: number, col: number) {
   const exists = !!cell;
   const solid = !cell || cell.dataset.solid === "1";
   const barrel = !!cell && (cell.dataset as any).barrel === "1";
-  return { cell, exists, solid, barrel } as const;
+  const powerup = !!cell && hasPowerup(cell);
+  return { cell, exists, solid, barrel, powerup } as const;
 }
 
 // =========================
@@ -57,6 +58,11 @@ export function createExplosion(): HTMLDivElement {
     background:
       "radial-gradient(circle, rgba(255,237,74,0.95) 0%, rgba(255,166,0,0.85) 55%, rgba(255,94,0,0.6) 75%, rgba(255,0,0,0.0) 100%)",
     borderRadius: "6px",
+    position: "absolute",
+    top: "0",
+    left: "0",
+    zIndex: "10",
+    pointerEvents: "none",
   });
   return el;
 }
@@ -98,10 +104,9 @@ export function armDynamite(
   if (!cell) return;
 
   // Can't place inside walls/solids (allow placing on open tiles only)
-  // Exception: allow placing on a power-up so players can bomb while standing on it
+  // Exception: allow placing on barrels (destructible blocks)
   const here = getCellFlags(grid, at.row, at.col);
-  const powerupPresent = hasPowerup(here.cell);
-  if (here.solid && !here.barrel && !powerupPresent) return;
+  if (here.solid && !here.barrel) return;
 
   // Create the dynamite element
   const dyn = createDynamite();
@@ -152,9 +157,9 @@ export function armDynamite(
         // Add this cell to affected cells
         affected.push({ row: r, col: c });
 
-        // Stop if we hit a solid wall or barrel
-        // (but we include the cell in the affected list for visual effects)
-        if (flags.solid) {
+        // Stop if we hit a solid wall or barrel, but continue through powerups
+        // (we include the cell in the affected list for visual effects)
+        if (flags.solid && !flags.powerup) {
           // If it's a barrel, we want to destroy it
           // If it's a solid wall, we want to stop the explosion
           break;
@@ -183,10 +188,14 @@ export function armDynamite(
       const target = getCell(grid, gp.row, gp.col);
       if (!target) continue;
 
-      // Skip solid walls (but not barrels which are also marked as solid)
+      // Skip solid walls (but not barrels, bombs, or powerups)
       const isBarrel = (target.dataset as any).barrel === "1";
+      const isBomb = (target.dataset as any).bomb === "1";
       const isSolid = target.dataset.solid === "1";
-      if (isSolid && !isBarrel && !(target.dataset as any).bomb) continue;
+      const isPowerup = hasPowerup(target);
+
+      // Only skip permanent solid walls - allow explosion to affect everything else
+      if (isSolid && !isBarrel && !isBomb && !isPowerup) continue;
 
       // Handle barrels
       if ((target.dataset as any).barrel === "1") {
@@ -223,8 +232,14 @@ export function armDynamite(
         }
       }
 
+      // Create explosion effect
       const puff = createExplosion();
+
+      // Add the explosion to the cell
+      // The z-index will ensure it appears below powerups
       target.appendChild(puff);
+
+      // Animate and clean up
       animateExplosion(puff, duration);
       window.setTimeout(() => {
         if (puff.parentElement) puff.parentElement.removeChild(puff);
