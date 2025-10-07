@@ -1,24 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { GameState, GameMode } from "../types/game";
+import Game from "./game";
 import { resetGrid } from "../game/grid";
+import { tracker } from "../game/tracker";
+import { GAME_CONFIG } from "../game/config";
 import {
   initializePlayers,
   startEngine,
   stopEngine,
   setOnPlayerDead,
   setOnTimeOver,
-  getGameState,
 } from "../game/engine";
-import { tracker } from "../game/tracker";
-import { GameHUD } from "../components/screens/gameHud";
 import { StartScreen } from "../components/screens/startScreen";
 import { EndScreen } from "../components/screens/endScreen";
-import { GameState, GameMode } from "../types/game";
-
+import { GameHUD } from "../components/screens/gameHud";
 import { PlayersHUD } from "../components/screens/playerHud";
 import { AudioController } from "../components/AudioController";
-import Game from "./game";
 
 export default function Home() {
   // Game state
@@ -96,7 +95,10 @@ export default function Home() {
         {/* Game HUD - Only show during gameplay */}
         {gameState === GameState.PLAYING && (
           <>
-            <GameHUD timeElapsedMs={timeElapsedMs} gameTimeLimit={300} />
+            <GameHUD
+              timeElapsedMs={timeElapsedMs}
+              gameTimeLimit={GAME_CONFIG.timeLimit}
+            />
             <PlayersHUD players={getPlayerStats()} />
           </>
         )}
@@ -114,7 +116,7 @@ export default function Home() {
           <EndScreen
             gameState={gameState}
             winner={winner}
-            timeLeft={300000 - timeElapsedMs} // 5 minutes in ms
+            timeLeft={GAME_CONFIG.timeLimit * 1000 - timeElapsedMs}
             gameStats={tracker.getGameStats()}
             onReturnToMenu={handleGameRestart}
             onPlayAgain={() => handleGameStart(gameMode)}

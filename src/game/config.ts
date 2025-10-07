@@ -1,5 +1,5 @@
 export const GAME_CONFIG = {
-  timeLimit: 300, // in seconds - 5 minutes
+  timeLimit: 180, // in seconds - 3 minutes
 };
 
 export const GRID_PATTERN = {
