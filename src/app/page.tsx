@@ -10,6 +10,8 @@ import {
   initializePlayers,
   startEngine,
   stopEngine,
+  pauseGame,
+  resumeGame,
   setOnPlayerDead,
   setOnTimeOver,
   setOnWin,
@@ -28,6 +30,27 @@ export default function Home() {
   const [gameState, setGameState] = useState<GameState>(GameState.START);
   const [timeElapsedMs, setTimeElapsedMs] = useState(0);
   const [winner, setWinner] = useState<any>(undefined);
+
+  // Handle keyboard events for pausing with Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // Toggle between paused and playing states
+        if (gameState === GameState.PLAYING) {
+          pauseGame();
+          setGameState(GameState.PAUSED);
+        } else if (gameState === GameState.PAUSED) {
+          resumeGame();
+          setGameState(GameState.PLAYING);
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [gameState]);
 
   // Initialize game when mode changes
   useEffect(() => {
@@ -122,8 +145,8 @@ export default function Home() {
 
       {/* Game Content */}
       <div className="relative z-10 w-full h-full flex items-center justify-center">
-        {/* Game HUD - Only show during gameplay */}
-        {gameState === GameState.PLAYING && (
+        {/* Game HUD - Show during gameplay and when paused */}
+        {(gameState === GameState.PLAYING || gameState === GameState.PAUSED) && (
           <>
             <GameHUD
               timeElapsedMs={timeElapsedMs}
@@ -133,8 +156,8 @@ export default function Home() {
           </>
         )}
 
-        {/* Game Screen */}
-        {gameState === GameState.PLAYING && <Game mode={gameMode} />}
+        {/* Game Screen - Show during gameplay and when paused */}
+        {(gameState === GameState.PLAYING || gameState === GameState.PAUSED) && <Game mode={gameMode} />}
 
         {/* Start Screen */}
         {gameState === GameState.START && (
@@ -143,7 +166,14 @@ export default function Home() {
 
         {/* Pause Screen */}
         {gameState === GameState.PAUSED && (
-          <PauseScreen onReturnToMenu={handleGameRestart} />
+          <PauseScreen 
+            onReturnToMenu={handleGameRestart} 
+            onResume={() => {
+              // Resume the game by calling the engine's resumeGame function
+              resumeGame();
+              setGameState(GameState.PLAYING);
+            }}
+          />
         )}
 
         {/* End Screen */}

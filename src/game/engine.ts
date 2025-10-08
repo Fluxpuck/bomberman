@@ -140,23 +140,25 @@ export function canMove(character: Character, direction: Direction): boolean {
 
   return true;
 }
-
-// =========================
 // Player Movement
 // =========================
 
 /**
- * Move a character in a direction if possible
+ * Move a character in a direction
  */
 export function moveCharacter(
   character: Character,
   direction: Direction
 ): boolean {
+  // Don't allow movement if game is paused
+  if (gameState === GameState.PAUSED) {
+    return false;
+  }
+  
   if (!canMove(character, direction)) {
     return false;
   }
-
-  // Update grid position
+  
   const { row, col } = character.gridPosition;
   let newRow = row;
   let newCol = col;
@@ -193,6 +195,11 @@ export function moveCharacter(
  * Place a bomb at a character's position
  */
 export function placeBomb(character: Character): boolean {
+  // Don't place bombs if game is paused
+  if (gameState === GameState.PAUSED) {
+    return false;
+  }
+  
   const now = Date.now();
   const lastTime = lastBombTimeByPlayer[character.id] || 0;
 
@@ -327,11 +334,25 @@ function setupInputListeners() {
     ) {
       e.preventDefault();
     }
+    
+    // Handle Escape key for pausing
+    if (e.key === "Escape") {
+      // Toggle between paused and playing states
+      if (gameState === GameState.PLAYING) {
+        pauseGame();
+      } else if (gameState === GameState.PAUSED) {
+        resumeGame();
+      }
+      return; // Don't track Escape in keyState
+    }
+    
     keyState[e.key] = true;
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
-    keyState[e.key] = false;
+    if (e.key !== "Escape") { // Don't track Escape in keyState
+      keyState[e.key] = false;
+    }
   };
 
   window.addEventListener("keydown", handleKeyDown);
@@ -430,7 +451,14 @@ function cleanupBlastCells(): void {
  * Main game update function
  */
 function update() {
-  if (gameState !== GameState.PLAYING) return;
+  // Don't update if not in playing state
+  if (gameState !== GameState.PLAYING) {
+    // If we're paused, just request the next frame but don't update game state
+    if (gameState === GameState.PAUSED) {
+      animationFrameId = requestAnimationFrame(update);
+    }
+    return;
+  }
 
   const currentTime = Date.now();
   const deltaTime = currentTime - lastUpdateTime;
@@ -442,7 +470,7 @@ function update() {
   // Handle player input
   handlePlayerInput();
 
-  // Update computer players
+  // Update computer players - only if game is not paused
   updateComputerPlayers(deltaTime);
 
   // Check time limit
@@ -547,6 +575,44 @@ export function startEngine() {
     if (removeListeners) removeListeners();
     stopEngine();
   };
+}
+
+/**
+ * Pause the game engine
+ */
+export function pauseGame() {
+  if (gameState !== GameState.PLAYING) return;
+  
+  // Stop game loop
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+
+  // Pause tracking game time
+  tracker.pauseGame();
+
+  // Set game state to paused
+  gameState = GameState.PAUSED;
+}
+
+/**
+ * Resume the game engine
+ */
+export function resumeGame() {
+  if (gameState !== GameState.PAUSED) return;
+  
+  // Resume tracking game time
+  tracker.resumeGame();
+  
+  // Reset last update time
+  lastUpdateTime = Date.now();
+  
+  // Restart game loop
+  animationFrameId = requestAnimationFrame(update);
+  
+  // Set game state to playing
+  gameState = GameState.PLAYING;
 }
 
 /**

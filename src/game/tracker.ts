@@ -194,7 +194,10 @@ class GameTracker {
   private static instance: GameTracker;
   private _players: Map<string, PlayerTracker> = new Map();
   private _startTime: number = 0;
+  private _pauseTime: number = 0;
+  private _pausedDuration: number = 0;
   private _isRunning: boolean = false;
+  private _isPaused: boolean = false;
 
   private constructor() {}
 
@@ -208,20 +211,47 @@ class GameTracker {
   // Game lifecycle
   startGame(): void {
     this._startTime = Date.now();
+    this._pausedDuration = 0;
     this._isRunning = true;
+    this._isPaused = false;
+  }
+
+  pauseGame(): void {
+    if (this._isRunning && !this._isPaused) {
+      this._pauseTime = Date.now();
+      this._isPaused = true;
+    }
+  }
+
+  resumeGame(): void {
+    if (this._isPaused) {
+      // Add the paused time to the total paused duration
+      this._pausedDuration += (Date.now() - this._pauseTime);
+      this._isPaused = false;
+    }
   }
 
   stopGame(): void {
     this._isRunning = false;
+    this._isPaused = false;
   }
 
   get isRunning(): boolean {
     return this._isRunning;
   }
 
+  get isPaused(): boolean {
+    return this._isPaused;
+  }
+
   get timeElapsedMs(): number {
     if (!this._isRunning) return 0;
-    return Date.now() - this._startTime;
+    if (this._isPaused) {
+      // If paused, return time elapsed up to the pause point
+      return this._pauseTime - this._startTime - this._pausedDuration;
+    }
+    // If running, return current time minus start time minus any paused duration
+    return Date.now() - this._startTime - this._pausedDuration;
   }
 
   // Player management
@@ -332,7 +362,10 @@ class GameTracker {
   reset(): void {
     this._players.clear();
     this._startTime = 0;
+    this._pauseTime = 0;
+    this._pausedDuration = 0;
     this._isRunning = false;
+    this._isPaused = false;
   }
 
   // =========================
