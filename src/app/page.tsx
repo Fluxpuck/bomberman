@@ -12,6 +12,7 @@ import {
   stopEngine,
   setOnPlayerDead,
   setOnTimeOver,
+  setOnWin,
   setDesiredPlayersCount,
 } from "../game/engine";
 import { StartScreen } from "../components/screens/startScreen";
@@ -43,6 +44,13 @@ export default function Home() {
       setGameState(GameState.GAME_OVER);
     });
 
+    setOnWin((winnerId) => {
+      // Get the full player stats object for the winner
+      const winnerStats = tracker.getPlayer(winnerId)?.getStats();
+      setWinner(winnerStats);
+      setGameState(GameState.WIN);
+    });
+
     // Start the game engine
     startEngine();
 
@@ -58,6 +66,8 @@ export default function Home() {
     };
   }, [gameState, gameMode]);
 
+  console.log("gameState", gameState);
+
   // Handle game start
   const handleGameStart = (mode: GameMode) => {
     setGameMode(mode);
@@ -66,7 +76,7 @@ export default function Home() {
     resetGrid();
     tracker.reset();
     tracker.startGame();
-    
+
     // Set the desired player count based on the game mode
     switch (mode) {
       case "solo":

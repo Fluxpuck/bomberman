@@ -46,11 +46,11 @@ export function EndScreen({
               <div className="flex items-center justify-center gap-3 mb-4">
                 <div
                   className="w-6 h-6 rounded-full"
-                  style={{ backgroundColor: winner.color }}
+                  style={{ backgroundColor: winner?.color || '#4A90E2' }}
                 />
                 <span className="text-xl font-semibold text-white">
-                  {winner.isPlayer ? "Player" : "Computer"}{" "}
-                  {winner.id.split("-")[1]} Wins!
+                  {winner?.isPlayer ? "Player" : "Computer"}{" "}
+                  {winner?.id && winner?.id.split("-")[1]} Wins!
                 </span>
               </div>
             </>
@@ -101,35 +101,35 @@ export function EndScreen({
             <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
               <div
                 className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: winner.color }}
+                style={{ backgroundColor: winner?.color || '#4A90E2' }}
               />
-              <span>{winner.isPlayer ? "Player" : "Computer"} Stats</span>
+              <span>{winner?.isPlayer ? "Player" : "Computer"} Stats</span>
             </h2>
 
             <div className="grid grid-cols-2 gap-y-2 text-sm">
               <div className="text-gray-400">Score</div>
               <div className="text-right font-medium text-white">
-                {winner.score}
+                {winner?.score || 0}
               </div>
 
               <div className="text-gray-400">Lives Left</div>
               <div className="text-right font-medium text-white">
-                {winner.lives}
+                {winner?.lives || 0}
               </div>
 
               <div className="text-gray-400">Bombs Placed</div>
               <div className="text-right font-medium text-white">
-                {winner.bombsPlaced}
+                {winner?.bombsPlaced || 0}
               </div>
 
               <div className="text-gray-400">Blocks Destroyed</div>
               <div className="text-right font-medium text-white">
-                {winner.blocksDestroyed}
+                {winner?.blocksDestroyed || 0}
               </div>
 
               <div className="text-gray-400">Kills</div>
               <div className="text-right font-medium text-white">
-                {winner.kills}
+                {winner?.kills || 0}
               </div>
             </div>
           </div>
