@@ -12,6 +12,7 @@ import {
   stopEngine,
   setOnPlayerDead,
   setOnTimeOver,
+  setDesiredPlayersCount,
 } from "../game/engine";
 import { StartScreen } from "../components/screens/startScreen";
 import { EndScreen } from "../components/screens/endScreen";
@@ -65,6 +66,24 @@ export default function Home() {
     resetGrid();
     tracker.reset();
     tracker.startGame();
+    
+    // Set the desired player count based on the game mode
+    switch (mode) {
+      case "solo":
+        setDesiredPlayersCount(1);
+        break;
+      case "2 players":
+        setDesiredPlayersCount(2);
+        break;
+      case "3 players":
+        setDesiredPlayersCount(3);
+        break;
+      case "4 players":
+        setDesiredPlayersCount(4);
+        break;
+      default:
+        setDesiredPlayersCount(1);
+    }
   };
 
   // Handle game restart
