@@ -121,15 +121,15 @@ export function armDynamite(
 
   // Get the fuse duration
   const fuse = Math.max(0, opts?.fuseMs ?? BOMB_CONFIG.fuseDuration);
-  
+
   // Generate a unique ID for this bomb based on its position
   const bombId = `bomb-${at.row}-${at.col}`;
-  
+
   // Clear any existing timer for this position
   if (bombTimers.has(bombId)) {
     window.clearTimeout(bombTimers.get(bombId));
   }
-  
+
   // After the fuse expires, explode the dynamite
   const timerId = window.setTimeout(() => {
     // Remove this timer from tracking once it executes
@@ -194,7 +194,7 @@ export function armDynamite(
     }
 
     // Play explosion sound
-    playSound("explosion", 0.5);
+    playSound("soundFX", "explosion", 0.5);
 
     // Visual effect: apply explosion puffs to affected cells, destroy barrels
     for (const gp of affected) {
@@ -209,41 +209,46 @@ export function armDynamite(
 
       // Only skip permanent solid walls - allow explosion to affect everything else
       if (isSolid && !isBarrel && !isBomb && !isPowerup) continue;
-      
+
       // Chain reaction: If this cell has a bomb, detonate it immediately
       if (isBomb) {
         // Trigger immediate detonation by setting a very short timeout
         // We use a small delay (10ms) to avoid infinite recursion and allow the current explosion to finish processing
-        const bombElement = Array.from(target.children).find(child => 
-          child.classList.contains('dynamite'));
+        const bombElement = Array.from(target.children).find((child) =>
+          child.classList.contains("dynamite")
+        );
         if (bombElement) {
           // Generate the bomb ID to cancel its timer
           const chainedBombId = `bomb-${gp.row}-${gp.col}`;
-          
+
           // Cancel the original timer for this bomb to prevent double explosion
           if (bombTimers.has(chainedBombId)) {
             window.clearTimeout(bombTimers.get(chainedBombId));
             bombTimers.delete(chainedBombId);
           }
-          
+
           // Remove the bomb element to prevent visual duplication
           target.removeChild(bombElement);
-          
+
           // Clear bomb flag immediately
           delete (target.dataset as any).bomb;
           if ((target.dataset as any).barrel !== "1") {
             target.dataset.solid = "0";
           }
-          
+
           // Trigger the chain reaction with a small delay
           window.setTimeout(() => {
-            armDynamite(grid, { row: gp.row, col: gp.col }, {
-              fuseMs: 0, // Immediate detonation
-              bombRange: opts?.bombRange,
-              ownerId: opts?.ownerId, // Attribute the chain reaction to the original bomb owner
-              onDetonate: opts?.onDetonate,
-              onExplode: opts?.onExplode
-            });
+            armDynamite(
+              grid,
+              { row: gp.row, col: gp.col },
+              {
+                fuseMs: 0, // Immediate detonation
+                bombRange: opts?.bombRange,
+                ownerId: opts?.ownerId, // Attribute the chain reaction to the original bomb owner
+                onDetonate: opts?.onDetonate,
+                onExplode: opts?.onExplode,
+              }
+            );
           }, 10);
         }
       }
@@ -301,7 +306,7 @@ export function armDynamite(
       opts?.onExplode?.(affected);
     }, Math.max(0, BOMB_CONFIG.explodeDuration));
   }, fuse);
-  
+
   // Store the timer ID for potential cancellation
   bombTimers.set(bombId, timerId);
 }

@@ -1,7 +1,7 @@
 import { useAudio } from "../hooks/useAudio";
 
 // Path to background music
-const BACKGROUND_MUSIC = "/music.mp3";
+const BACKGROUND_MUSIC = "/music/lo-fi.mp3";
 
 interface AudioControllerProps {
   autoPlay?: boolean;

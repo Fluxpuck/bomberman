@@ -43,7 +43,7 @@ export abstract class Character {
     this.startDamageAnimation();
 
     // Play the grunt sound when hit
-    playSound("grunt", 0.7);
+    playSound("soundFX", "grunt", 0.7);
   }
 
   private startDamageAnimation(): void {

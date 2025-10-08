@@ -113,7 +113,7 @@ export default function Home() {
       {/* Background */}
       <div
         className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url(/background.jpg)" }}
+        style={{ backgroundImage: "url(/image/background.jpg)" }}
       />
 
       {/* Audio Controller - Always visible */}

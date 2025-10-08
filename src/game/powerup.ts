@@ -102,13 +102,13 @@ export function checkPowerupPickup(character: Character): void {
   // Handle extra bomb powerup
   if (powerupType === "extraBomb") {
     playerTracker.addBomb();
-    playSound("powerup-extraBomb", 0.6);
+    playSound("soundFX", "powerup-extraBomb", 0.6);
   }
 
   // Handle increase range powerup
   else if (powerupType === "increaseRange") {
     playerTracker.increaseBombRange();
-    playSound("powerup-increaseRange", 0.6);
+    playSound("soundFX", "powerup-increaseRange", 0.6);
   }
 
   // Remove the powerup from the cell

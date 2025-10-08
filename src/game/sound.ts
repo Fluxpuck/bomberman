@@ -11,6 +11,7 @@ const audioCache: Record<string, HTMLAudioElement> = {};
  * @returns The audio element
  */
 export function playSound(
+  path: string,
   soundName: string,
   volume: number = 1.0,
   loop: boolean = false
@@ -20,30 +21,30 @@ export function playSound(
   try {
     // Check if we already have this sound cached
     let audio = audioCache[soundName];
-    
+
     // Create a new audio element if not cached
     if (!audio) {
-      audio = new Audio(`/${soundName}.mp3`);
+      audio = new Audio(`${path}/${soundName}.mp3`);
       audioCache[soundName] = audio;
     } else {
       // Reset the audio if it exists
       audio.currentTime = 0;
     }
-    
+
     // Configure audio
     audio.volume = volume;
     audio.loop = loop;
-    
+
     // Play the sound
     const playPromise = audio.play();
-    
+
     // Handle autoplay restrictions
     if (playPromise !== undefined) {
-      playPromise.catch(error => {
+      playPromise.catch((error) => {
         console.log(`Error playing sound ${soundName}:`, error);
       });
     }
-    
+
     return audio;
   } catch (error) {
     console.error(`Error playing sound ${soundName}:`, error);
@@ -57,7 +58,7 @@ export function playSound(
  */
 export function stopSound(soundName: string): void {
   if (typeof window === "undefined") return;
-  
+
   const audio = audioCache[soundName];
   if (audio) {
     audio.pause();
@@ -71,10 +72,10 @@ export function stopSound(soundName: string): void {
  */
 export function setGlobalVolume(volume: number): void {
   if (typeof window === "undefined") return;
-  
+
   const normalizedVolume = Math.max(0, Math.min(1, volume));
-  
-  Object.values(audioCache).forEach(audio => {
+
+  Object.values(audioCache).forEach((audio) => {
     audio.volume = normalizedVolume;
   });
 }

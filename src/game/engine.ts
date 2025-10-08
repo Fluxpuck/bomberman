@@ -213,7 +213,7 @@ function placeBomb(character: Character): boolean {
   lastBombTimeByPlayer[character.id] = now;
 
   // Play bomb placement sound
-  playSound("dropping-bomb", 0.8);
+  playSound("soundFX", "dropping-bomb", 0.5);
 
   // Place the bomb on the grid
   armDynamite(grid, character.gridPosition, {
