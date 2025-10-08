@@ -1,5 +1,5 @@
 import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./config";
-import { grid, isWalkable,  gridRows, gridCols } from "./grid";
+import { grid, isWalkable, gridRows, gridCols } from "./grid";
 import { Character, Player, Computer, characterManager } from "./player";
 import { tracker } from "./tracker";
 import { armDynamite } from "./animations";
@@ -148,7 +148,10 @@ export function canMove(character: Character, direction: Direction): boolean {
 /**
  * Move a character in a direction if possible
  */
-export function moveCharacter(character: Character, direction: Direction): boolean {
+export function moveCharacter(
+  character: Character,
+  direction: Direction
+): boolean {
   if (!canMove(character, direction)) {
     return false;
   }
@@ -586,7 +589,7 @@ export function resetEngine() {
     keyState[key] = false;
     keyProcessed[key] = false;
   });
-  
+
   // Reset AI state
   resetAIState();
 

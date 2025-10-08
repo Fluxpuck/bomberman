@@ -61,10 +61,9 @@ export function updateComputerPlayers(deltaTime: number): void {
 }
 
 /**
- * Reset AI state
+ * Reset AI state by clearing all AI tracking data
  */
 export function resetAIState(): void {
-  // Clear all AI tracking data
   Object.keys(computerLastMoveTime).forEach((key) => {
     delete computerLastMoveTime[key];
   });
