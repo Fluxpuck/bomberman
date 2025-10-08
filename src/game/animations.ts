@@ -10,6 +10,9 @@ import { createPowerUp, hasPowerup, PowerupType } from "./powerup";
 import { tracker } from "./tracker";
 import { playSound } from "./sound";
 
+// Track bomb timers to prevent double explosions
+const bombTimers: Map<string, number> = new Map();
+
 // =========================
 // Grid helpers
 // =========================
@@ -118,9 +121,19 @@ export function armDynamite(
 
   // Get the fuse duration
   const fuse = Math.max(0, opts?.fuseMs ?? BOMB_CONFIG.fuseDuration);
-
+  
+  // Generate a unique ID for this bomb based on its position
+  const bombId = `bomb-${at.row}-${at.col}`;
+  
+  // Clear any existing timer for this position
+  if (bombTimers.has(bombId)) {
+    window.clearTimeout(bombTimers.get(bombId));
+  }
+  
   // After the fuse expires, explode the dynamite
-  window.setTimeout(() => {
+  const timerId = window.setTimeout(() => {
+    // Remove this timer from tracking once it executes
+    bombTimers.delete(bombId);
     if (dyn.parentElement) dyn.parentElement.removeChild(dyn); // Remove dynamite visual
 
     // Clear bomb flag and restore walkability if there's no barrel
@@ -132,8 +145,8 @@ export function armDynamite(
     // Gather explosion cells (center + range in all directions)
     const affected: GridPosition[] = [{ row: at.row, col: at.col }];
     const range = Math.min(
-      Math.max(0, opts?.bombRange ?? BOMB_CONFIG.bombRange ?? 0),
-      Math.max(0, BOMB_CONFIG.maxRange ?? Number.POSITIVE_INFINITY)
+      Math.max(0, opts?.bombRange ?? BOMB_CONFIG.blastRadius ?? 0),
+      Math.max(0, BOMB_CONFIG.maxBlastRadius ?? Number.POSITIVE_INFINITY)
     );
     // Interpret range as total reach INCLUDING the center tile.
     // Therefore, outward tiles per direction = range - 1.
@@ -196,6 +209,44 @@ export function armDynamite(
 
       // Only skip permanent solid walls - allow explosion to affect everything else
       if (isSolid && !isBarrel && !isBomb && !isPowerup) continue;
+      
+      // Chain reaction: If this cell has a bomb, detonate it immediately
+      if (isBomb) {
+        // Trigger immediate detonation by setting a very short timeout
+        // We use a small delay (10ms) to avoid infinite recursion and allow the current explosion to finish processing
+        const bombElement = Array.from(target.children).find(child => 
+          child.classList.contains('dynamite'));
+        if (bombElement) {
+          // Generate the bomb ID to cancel its timer
+          const chainedBombId = `bomb-${gp.row}-${gp.col}`;
+          
+          // Cancel the original timer for this bomb to prevent double explosion
+          if (bombTimers.has(chainedBombId)) {
+            window.clearTimeout(bombTimers.get(chainedBombId));
+            bombTimers.delete(chainedBombId);
+          }
+          
+          // Remove the bomb element to prevent visual duplication
+          target.removeChild(bombElement);
+          
+          // Clear bomb flag immediately
+          delete (target.dataset as any).bomb;
+          if ((target.dataset as any).barrel !== "1") {
+            target.dataset.solid = "0";
+          }
+          
+          // Trigger the chain reaction with a small delay
+          window.setTimeout(() => {
+            armDynamite(grid, { row: gp.row, col: gp.col }, {
+              fuseMs: 0, // Immediate detonation
+              bombRange: opts?.bombRange,
+              ownerId: opts?.ownerId, // Attribute the chain reaction to the original bomb owner
+              onDetonate: opts?.onDetonate,
+              onExplode: opts?.onExplode
+            });
+          }, 10);
+        }
+      }
 
       // Handle barrels
       if ((target.dataset as any).barrel === "1") {
@@ -250,4 +301,7 @@ export function armDynamite(
       opts?.onExplode?.(affected);
     }, Math.max(0, BOMB_CONFIG.explodeDuration));
   }, fuse);
+  
+  // Store the timer ID for potential cancellation
+  bombTimers.set(bombId, timerId);
 }

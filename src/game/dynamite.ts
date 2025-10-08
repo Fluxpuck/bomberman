@@ -6,6 +6,7 @@ import { BOMB_CONFIG } from "./config";
 export function createDynamite(): HTMLDivElement {
   // Create the dynamite element
   const bomb = document.createElement("div");
+  bomb.classList.add("dynamite");
   Object.assign(bomb.style, {
     width: "35%",
     height: "70%",
