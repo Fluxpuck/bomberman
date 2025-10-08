@@ -137,17 +137,6 @@ function canMove(character: Character, direction: Direction): boolean {
     return false;
   }
 
-  // Check collision with other players
-  for (const otherChar of characterManager.getAll()) {
-    if (
-      otherChar.id !== character.id &&
-      otherChar.gridPosition.row === targetRow &&
-      otherChar.gridPosition.col === targetCol
-    ) {
-      return false;
-    }
-  }
-
   return true;
 }
 
