@@ -71,7 +71,7 @@ export default function Game({ mode }: GameProps) {
       charElement.dataset.character = char.id;
 
       const cellSize = GRID_PATTERN.cellSize;
-      const charSize = cellSize - 8; // Slightly smaller than cell for better visibility
+      const charSize = cellSize - 8;
 
       // Create darker shade of player color for border
       const darkenColor = (color: string): string => {
@@ -81,7 +81,7 @@ export default function Game({ mode }: GameProps) {
           const g = parseInt(color.slice(3, 5), 16);
           const b = parseInt(color.slice(5, 7), 16);
 
-          const darkenFactor = 0.6; // Make it 40% darker
+          const darkenFactor = 0.6;
           const dr = Math.floor(r * darkenFactor);
           const dg = Math.floor(g * darkenFactor);
           const db = Math.floor(b * darkenFactor);

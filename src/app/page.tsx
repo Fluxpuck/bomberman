@@ -116,11 +116,11 @@ export default function Home() {
         style={{ backgroundImage: "url(/background.jpg)" }}
       />
 
+      {/* Audio Controller - Always visible */}
+      <AudioController autoPlay={true} />
+
       {/* Game Content */}
       <div className="relative z-10 w-full h-full flex items-center justify-center">
-        {/* Audio Controller - Always visible */}
-        <AudioController autoPlay={gameState === GameState.PLAYING} />
-
         {/* Game HUD - Only show during gameplay */}
         {gameState === GameState.PLAYING && (
           <>
