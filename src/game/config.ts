@@ -18,11 +18,10 @@ export const PLAYER_CONFIG = {
 };
 
 export const BOMB_CONFIG = {
-  bombRange: 2,
-  maxRange: 6,
   fuseDuration: 1000,
   explodeDuration: 750,
-  blastRadius: 1,
+  blastRadius: 2,
+  maxBlastRadius: 6,
   bombs: 1,
   maxBombs: 5,
   cooldown: 0,
