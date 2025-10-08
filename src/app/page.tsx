@@ -16,6 +16,7 @@ import {
   setDesiredPlayersCount,
 } from "../game/engine";
 import { StartScreen } from "../components/screens/startScreen";
+import { PauseScreen } from "../components/screens/pauseScreen";
 import { EndScreen } from "../components/screens/endScreen";
 import { GameHUD } from "../components/screens/gameHud";
 import { PlayersHUD } from "../components/screens/playerHud";
@@ -138,6 +139,11 @@ export default function Home() {
         {/* Start Screen */}
         {gameState === GameState.START && (
           <StartScreen onStart={handleGameStart} />
+        )}
+
+        {/* Pause Screen */}
+        {gameState === GameState.PAUSED && (
+          <PauseScreen onReturnToMenu={handleGameRestart} />
         )}
 
         {/* End Screen */}
