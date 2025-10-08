@@ -1,53 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useAudio } from "../hooks/useAudio";
+
+// Path to background music
+const BACKGROUND_MUSIC = "/music.mp3";
 
 interface AudioControllerProps {
   autoPlay?: boolean;
 }
 
 export function AudioController({ autoPlay = true }: AudioControllerProps) {
-  const [volume, setVolume] = useState<number>(0.5);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize audio when component mounts
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      audioRef.current = new Audio("/music.mp3");
-      audioRef.current.loop = true;
-      audioRef.current.volume = volume;
-
-      if (autoPlay) {
-        // Use a timeout to ensure browser allows autoplay after user interaction
-        const playPromise = audioRef.current.play();
-
-        if (playPromise !== undefined) {
-          playPromise.catch((error) => {
-            // Auto-play was prevented
-            console.log("Autoplay prevented, waiting for user interaction");
-          });
-        }
-      }
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-      }
-    };
-  }, [autoPlay]);
-
-  // Update volume when it changes
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-  };
+  const { volume, isMuted, toggleMute, setVolume } = useAudio({
+    audioSrc: BACKGROUND_MUSIC,
+    autoPlay,
+    loop: true,
+    defaultVolume: 0.5,
+    defaultMuted: false,
+  });
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setVolume(parseFloat(e.target.value));
