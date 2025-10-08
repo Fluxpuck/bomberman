@@ -47,11 +47,11 @@ class PlayerTracker {
   constructor(private _character: Character) {}
 
   // Character reference
+
   get character(): Character {
     return this._character;
   }
 
-  // Basic properties
   get id(): string {
     return this._character.id;
   }
@@ -68,7 +68,6 @@ class PlayerTracker {
     return this._character.color;
   }
 
-  // Position tracking
   get position(): Position {
     return this._character.position;
   }
@@ -77,7 +76,6 @@ class PlayerTracker {
     return this._character.gridPosition;
   }
 
-  // Life tracking
   get lives(): number {
     return this._character.lives;
   }
@@ -99,68 +97,43 @@ class PlayerTracker {
     this._character.setImmune();
   }
 
-  /**
-   * Get the maximum number of bombs this character can place at once
-   */
   get bombsAvailable(): number {
     return this._character.inventory;
   }
 
-  /**
-   * Get the explosion range of this character's bombs
-   */
   get bombRange(): number {
     return this._character.bombRange;
   }
 
-  /**
-   * Get the number of bombs this character currently has active on the grid
-   */
   get activeBombs(): number {
     return this._activeBombs;
   }
 
-  /**
-   * Increment the active bombs counter and total bombs placed
-   */
   incrementActiveBombs(): void {
     this._activeBombs++;
     this._bombsPlaced++;
   }
 
-  /**
-   * Decrement the active bombs counter when a bomb explodes
-   */
   decrementActiveBombs(): void {
     this._activeBombs = Math.max(0, this._activeBombs - 1);
   }
 
-  /**
-   * Check if the character can place another bomb
-   * This depends on how many bombs they can have active at once (inventory)
-   * and how many they currently have active (activeBombs)
-   */
   canPlaceBomb(): boolean {
     return this._activeBombs < this._character.inventory;
   }
 
   // Inventory management
 
-  /**
-   * Increase the maximum number of bombs the character can place at once
-   */
   addBomb(): void {
     this._character.addBomb();
   }
 
-  /**
-   * Increase the bomb explosion range
-   */
-  increaseBombRange(amount: number = 1): void {
-    this._character.increaseBombRange(amount);
+  increaseBombRange(): void {
+    this._character.increaseBombRange();
   }
 
   // Stats tracking
+
   get bombsPlaced(): number {
     return this._bombsPlaced;
   }
@@ -184,6 +157,7 @@ class PlayerTracker {
   }
 
   // Score tracking
+
   get score(): number {
     return this._score;
   }

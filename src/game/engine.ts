@@ -1,11 +1,12 @@
 import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./config";
-import { grid, isWalkable, getCellAt, gridRows, gridCols } from "./grid";
+import { grid, isWalkable,  gridRows, gridCols } from "./grid";
 import { Character, Player, Computer, characterManager } from "./player";
 import { tracker } from "./tracker";
 import { armDynamite } from "./animations";
 import { checkPowerupPickup } from "./powerup";
 import { playSound } from "./sound";
 import { Direction, GridPosition, Position, GameState } from "../types/game";
+import { updateComputerPlayers, resetAIState } from "./ai";
 
 // =========================
 // Engine State
@@ -109,7 +110,7 @@ function getCornerSpawn(corner: "tl" | "tr" | "bl" | "br"): GridPosition {
 /**
  * Check if a player can move in a direction
  */
-function canMove(character: Character, direction: Direction): boolean {
+export function canMove(character: Character, direction: Direction): boolean {
   const { row, col } = character.gridPosition;
   let targetRow = row;
   let targetCol = col;
@@ -147,7 +148,7 @@ function canMove(character: Character, direction: Direction): boolean {
 /**
  * Move a character in a direction if possible
  */
-function moveCharacter(character: Character, direction: Direction): boolean {
+export function moveCharacter(character: Character, direction: Direction): boolean {
   if (!canMove(character, direction)) {
     return false;
   }
@@ -188,7 +189,7 @@ function moveCharacter(character: Character, direction: Direction): boolean {
 /**
  * Place a bomb at a character's position
  */
-function placeBomb(character: Character): boolean {
+export function placeBomb(character: Character): boolean {
   const now = Date.now();
   const lastTime = lastBombTimeByPlayer[character.id] || 0;
 
@@ -343,62 +344,7 @@ function setupInputListeners() {
 // Computer AI
 // =========================
 
-// Store computer movement state outside the function for persistence
-const computerLastMoveTime: Record<string, number> = {};
-const computerMoveDelay: Record<string, number> = {};
-
-/**
- * Update computer player AI
- */
-function updateComputerPlayers(deltaTime: number) {
-  const computers = characterManager.getComputers();
-  const currentTime = Date.now();
-
-  for (const computer of computers) {
-    if (!computer.isAlive()) continue;
-
-    // Initialize tracking for this computer if needed
-    if (!computerLastMoveTime[computer.id]) {
-      computerLastMoveTime[computer.id] = 0;
-      // Random move delay between 500-1500ms for more natural movement
-      computerMoveDelay[computer.id] = 500 + Math.random() * 1000;
-    }
-
-    // Check if it's time to move
-    if (
-      currentTime - computerLastMoveTime[computer.id] >
-      computerMoveDelay[computer.id]
-    ) {
-      // Simple random movement AI
-      const directions = [
-        Direction.UP,
-        Direction.DOWN,
-        Direction.LEFT,
-        Direction.RIGHT,
-      ];
-
-      // Try to find a valid move direction
-      const shuffledDirections = [...directions].sort(
-        () => Math.random() - 0.5
-      );
-
-      for (const direction of shuffledDirections) {
-        if (canMove(computer, direction)) {
-          moveCharacter(computer, direction);
-          computerLastMoveTime[computer.id] = currentTime;
-          // Set a new random delay for next move
-          computerMoveDelay[computer.id] = 500 + Math.random() * 1000;
-          break;
-        }
-      }
-
-      // Random bomb placement (10% chance when moving)
-      if (Math.random() < 0.1) {
-        placeBomb(computer);
-      }
-    }
-  }
-}
+// AI logic moved to ai.ts
 
 // =========================
 // Game Loop
@@ -640,6 +586,9 @@ export function resetEngine() {
     keyState[key] = false;
     keyProcessed[key] = false;
   });
+  
+  // Reset AI state
+  resetAIState();
 
   // Clear all active blast cells
   activeBlastCells.length = 0;
