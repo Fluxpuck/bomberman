@@ -367,38 +367,6 @@ class GameTracker {
     this._isRunning = false;
     this._isPaused = false;
   }
-
-  // =========================
-  // Backward Compatibility Methods
-  // =========================
-
-  // These methods are added for backward compatibility with existing code
-
-  // Alias for totalBombsPlaced
-  get globalDynamitesPlaced(): number {
-    return this.totalBombsPlaced;
-  }
-
-  // Alias for totalBlocksDestroyed
-  get globalBlocksDestroyed(): number {
-    return this.totalBlocksDestroyed;
-  }
-
-  // Direct access to player 1's stats
-  incrementBlocksDestroyed(count: number = 1): void {
-    const player = this.getHumanPlayers()[0];
-    if (player) {
-      player.incrementBlocksDestroyed(count);
-    }
-  }
-
-  // Direct access to player 1's score
-  addScore(points: number): void {
-    const player = this.getHumanPlayers()[0];
-    if (player) {
-      player.addScore(points);
-    }
-  }
 }
 
 // Export singleton instance

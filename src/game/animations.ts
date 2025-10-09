@@ -266,14 +266,7 @@ export function armDynamite(
           if (owner) {
             owner.incrementBlocksDestroyed(1);
             owner.addScore(SCORE_CONFIG.pointsPerBarrel || 0);
-          } else {
-            // Fallback to global tracker if player not found
-            tracker.incrementBlocksDestroyed(1);
-            tracker.addScore(SCORE_CONFIG.pointsPerBarrel || 0);
           }
-        } else {
-          tracker.incrementBlocksDestroyed(1);
-          tracker.addScore(SCORE_CONFIG.pointsPerBarrel || 0);
         }
 
         const dropChance = Math.max(

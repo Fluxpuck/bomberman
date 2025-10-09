@@ -112,7 +112,7 @@ function getCornerSpawn(corner: "tl" | "tr" | "bl" | "br"): GridPosition {
  */
 export function canMove(character: Character, direction: Direction): boolean {
   const { row, col } = character.gridPosition;
-  
+
   const movements = {
     [Direction.UP]: { row: -1, col: 0 },
     [Direction.DOWN]: { row: 1, col: 0 },
@@ -148,11 +148,11 @@ export function moveCharacter(
   if (gameState === GameState.PAUSED) {
     return false;
   }
-  
+
   if (!canMove(character, direction)) {
     return false;
   }
-  
+
   // Use the character's own move method to update positions
   character.move(direction);
 
@@ -173,7 +173,7 @@ export function placeBomb(character: Character): boolean {
   if (gameState === GameState.PAUSED) {
     return false;
   }
-  
+
   const now = Date.now();
   const lastTime = lastBombTimeByPlayer[character.id] || 0;
 
@@ -202,7 +202,7 @@ export function placeBomb(character: Character): boolean {
 
   // Create a copy of the grid position to ensure the bomb stays where it was placed
   const bombPosition = { ...character.gridPosition };
-  
+
   // Place the bomb on the grid
   armDynamite(grid, bombPosition, {
     bombRange: playerTracker.bombRange,
@@ -311,7 +311,7 @@ function setupInputListeners() {
     ) {
       e.preventDefault();
     }
-    
+
     // Handle Escape key for pausing
     if (e.key === "Escape") {
       // Toggle between paused and playing states
@@ -322,12 +322,13 @@ function setupInputListeners() {
       }
       return; // Don't track Escape in keyState
     }
-    
+
     keyState[e.key] = true;
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
-    if (e.key !== "Escape") { // Don't track Escape in keyState
+    if (e.key !== "Escape") {
+      // Don't track Escape in keyState
       keyState[e.key] = false;
     }
   };
@@ -559,7 +560,7 @@ export function startEngine() {
  */
 export function pauseGame() {
   if (gameState !== GameState.PLAYING) return;
-  
+
   // Stop game loop
   if (animationFrameId !== null) {
     cancelAnimationFrame(animationFrameId);
@@ -578,16 +579,16 @@ export function pauseGame() {
  */
 export function resumeGame() {
   if (gameState !== GameState.PAUSED) return;
-  
+
   // Resume tracking game time
   tracker.resumeGame();
-  
+
   // Reset last update time
   lastUpdateTime = Date.now();
-  
+
   // Restart game loop
   animationFrameId = requestAnimationFrame(update);
-  
+
   // Set game state to playing
   gameState = GameState.PLAYING;
 }
