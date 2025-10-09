@@ -1,5 +1,5 @@
 import { Direction, GridPosition, Position } from "../types/game";
-import { PLAYER_CONFIG, BOMB_CONFIG } from "./config";
+import { PLAYER_CONFIG, BOMB_CONFIG, GRID_PATTERN } from "./config";
 import { playSound } from "./sound";
 
 // =========================
@@ -25,17 +25,21 @@ export abstract class Character {
 
   public move(direction: Direction): void {
     const movements = {
-      [Direction.UP]: { y: -1, row: -1, x: 0, col: 0 },
-      [Direction.DOWN]: { y: 1, row: 1, x: 0, col: 0 },
-      [Direction.LEFT]: { x: -1, col: -1, y: 0, row: 0 },
-      [Direction.RIGHT]: { x: 1, col: 1, y: 0, row: 0 },
+      [Direction.UP]: { row: -1, col: 0 },
+      [Direction.DOWN]: { row: 1, col: 0 },
+      [Direction.LEFT]: { row: 0, col: -1 },
+      [Direction.RIGHT]: { row: 0, col: 1 },
     };
 
     const movement = movements[direction];
-    this.position.x += movement.x;
-    this.position.y += movement.y;
-    this.gridPosition.col += movement.col;
+    
+    // Update grid position
     this.gridPosition.row += movement.row;
+    this.gridPosition.col += movement.col;
+    
+    // Update pixel position based on grid position using cell size
+    this.position.x = this.gridPosition.col * GRID_PATTERN.cellSize;
+    this.position.y = this.gridPosition.row * GRID_PATTERN.cellSize;
   }
 
   public takeDamage(): void {
@@ -242,23 +246,16 @@ export class Computer extends Character {
 
     // Check each direction for safety
     for (const direction of shuffledDirections) {
-      let newRow = this.currentPosition.row;
-      let newCol = this.currentPosition.col;
-
-      switch (direction) {
-        case Direction.UP:
-          newRow--;
-          break;
-        case Direction.DOWN:
-          newRow++;
-          break;
-        case Direction.LEFT:
-          newCol--;
-          break;
-        case Direction.RIGHT:
-          newCol++;
-          break;
-      }
+      const movements = {
+        [Direction.UP]: { row: -1, col: 0 },
+        [Direction.DOWN]: { row: 1, col: 0 },
+        [Direction.LEFT]: { row: 0, col: -1 },
+        [Direction.RIGHT]: { row: 0, col: 1 },
+      };
+      
+      const movement = movements[direction];
+      const newRow = this.currentPosition.row + movement.row;
+      const newCol = this.currentPosition.col + movement.col;
 
       // Check if new position is within grid bounds
       if (

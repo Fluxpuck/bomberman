@@ -48,7 +48,7 @@ const BOMB_COOLDOWN_MS = 250;
 /**
  * Convert a grid position to pixel position
  */
-function gridToPixel(gridPos: GridPosition): Position {
+export function gridToPixel(gridPos: GridPosition): Position {
   return {
     x: gridPos.col * GRID_PATTERN.cellSize,
     y: gridPos.row * GRID_PATTERN.cellSize,
@@ -112,23 +112,17 @@ function getCornerSpawn(corner: "tl" | "tr" | "bl" | "br"): GridPosition {
  */
 export function canMove(character: Character, direction: Direction): boolean {
   const { row, col } = character.gridPosition;
-  let targetRow = row;
-  let targetCol = col;
+  
+  const movements = {
+    [Direction.UP]: { row: -1, col: 0 },
+    [Direction.DOWN]: { row: 1, col: 0 },
+    [Direction.LEFT]: { row: 0, col: -1 },
+    [Direction.RIGHT]: { row: 0, col: 1 },
+  };
 
-  switch (direction) {
-    case Direction.UP:
-      targetRow--;
-      break;
-    case Direction.DOWN:
-      targetRow++;
-      break;
-    case Direction.LEFT:
-      targetCol--;
-      break;
-    case Direction.RIGHT:
-      targetCol++;
-      break;
-  }
+  const movement = movements[direction];
+  const targetRow = row + movement.row;
+  const targetCol = col + movement.col;
 
   // Check grid boundaries and walkable cells
   if (
@@ -159,28 +153,8 @@ export function moveCharacter(
     return false;
   }
   
-  const { row, col } = character.gridPosition;
-  let newRow = row;
-  let newCol = col;
-
-  switch (direction) {
-    case Direction.UP:
-      newRow--;
-      break;
-    case Direction.DOWN:
-      newRow++;
-      break;
-    case Direction.LEFT:
-      newCol--;
-      break;
-    case Direction.RIGHT:
-      newCol++;
-      break;
-  }
-
-  // Update character position
-  character.gridPosition = { row: newRow, col: newCol };
-  character.position = gridToPixel(character.gridPosition);
+  // Use the character's own move method to update positions
+  character.move(direction);
 
   // Check if the character moved into a blast cell
   checkBlastCellDamage(character);
@@ -226,8 +200,11 @@ export function placeBomb(character: Character): boolean {
   // Play bomb placement sound
   playSound("soundFX", "dropping-bomb", 0.5);
 
+  // Create a copy of the grid position to ensure the bomb stays where it was placed
+  const bombPosition = { ...character.gridPosition };
+  
   // Place the bomb on the grid
-  armDynamite(grid, character.gridPosition, {
+  armDynamite(grid, bombPosition, {
     bombRange: playerTracker.bombRange,
     ownerId: character.id,
     onDetonate: (cells, duration) => {
