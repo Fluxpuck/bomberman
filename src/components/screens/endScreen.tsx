@@ -1,4 +1,5 @@
 import React from "react";
+import { GAME_CONFIG } from "@/game/config";
 import { GameStats, PlayerStats } from "../../game/tracker";
 import { GameState } from "../../types/game";
 
@@ -30,6 +31,12 @@ export function EndScreen({
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
+  // Limit timePlayed maximum to configured timeLimit
+  const timePlayed = Math.min(
+    gameStats.timeElapsedMs,
+    GAME_CONFIG.timeLimit * 1000
+  );
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 w-96 max-w-full shadow-2xl">
@@ -46,7 +53,7 @@ export function EndScreen({
               <div className="flex items-center justify-center gap-3 mb-4">
                 <div
                   className="w-6 h-6 rounded-full"
-                  style={{ backgroundColor: winner?.color || '#4A90E2' }}
+                  style={{ backgroundColor: winner?.color || "#4A90E2" }}
                 />
                 <span className="text-xl font-semibold text-white">
                   {winner?.isPlayer ? "Player" : "Computer"}{" "}
@@ -66,7 +73,7 @@ export function EndScreen({
           <div className="grid grid-cols-2 gap-y-2 text-sm">
             <div className="text-gray-400">Time Played</div>
             <div className="text-right font-medium text-white">
-              {formatTime(gameStats.timeElapsedMs)}
+              {formatTime(timePlayed)}
             </div>
 
             {timeLeft > 0 && (
@@ -101,7 +108,7 @@ export function EndScreen({
             <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
               <div
                 className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: winner?.color || '#4A90E2' }}
+                style={{ backgroundColor: winner?.color || "#4A90E2" }}
               />
               <span>{winner?.isPlayer ? "Player" : "Computer"} Stats</span>
             </h2>
