@@ -1,6 +1,6 @@
 import { Direction, GridPosition, Position } from "../types/game";
-import { PLAYER_CONFIG, BOMB_CONFIG, GRID_PATTERN } from "./config";
-import { playSound } from "./sound";
+import { PLAYER_CONFIG, BOMB_CONFIG, GRID_PATTERN } from "./core/config";
+import { playSound } from "./hooks/sound";
 
 // =========================
 // Base Character Class
@@ -32,11 +32,11 @@ export abstract class Character {
     };
 
     const movement = movements[direction];
-    
+
     // Update grid position
     this.gridPosition.row += movement.row;
     this.gridPosition.col += movement.col;
-    
+
     // Update pixel position based on grid position using cell size
     this.position.x = this.gridPosition.col * GRID_PATTERN.cellSize;
     this.position.y = this.gridPosition.row * GRID_PATTERN.cellSize;
@@ -252,7 +252,7 @@ export class Computer extends Character {
         [Direction.LEFT]: { row: 0, col: -1 },
         [Direction.RIGHT]: { row: 0, col: 1 },
       };
-      
+
       const movement = movements[direction];
       const newRow = this.currentPosition.row + movement.row;
       const newCol = this.currentPosition.col + movement.col;

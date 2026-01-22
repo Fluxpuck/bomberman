@@ -1,5 +1,5 @@
 import React from "react";
-import { PlayerStats } from "../../game/tracker";
+import { PlayerStats } from "../../game/hooks/tracker";
 
 type CornerPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 

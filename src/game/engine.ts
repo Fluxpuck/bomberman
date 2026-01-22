@@ -1,10 +1,10 @@
-import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./config";
+import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./core/config";
 import { grid, isWalkable, gridRows, gridCols } from "./grid";
 import { Character, Player, Computer, characterManager } from "./player";
-import { tracker } from "./tracker";
+import { tracker } from "./hooks/tracker";
 import { armDynamite } from "./animations";
 import { checkPowerupPickup } from "./powerup";
-import { playSound } from "./sound";
+import { playSound } from "./hooks/sound";
 import { Direction, GridPosition, Position, GameState } from "../types/game";
 import { updateComputerPlayers, resetAIState } from "./ai";
 

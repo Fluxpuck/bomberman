@@ -1,6 +1,6 @@
-import { PLAYER_CONFIG, BOMB_CONFIG, SCORE_CONFIG } from "./config";
-import { Character, Player, Computer } from "./player";
-import { GridPosition, Position } from "../types/game";
+import { PLAYER_CONFIG, BOMB_CONFIG, SCORE_CONFIG } from "../core/config";
+import { Character, Player, Computer } from "../player";
+import { GridPosition, Position } from "../../types/game";
 
 // =========================
 // Player Stats Interface
@@ -18,7 +18,7 @@ export interface PlayerStats {
   bombsPlaced: number;
   activeBombs: number;
   isAlive: boolean;
-  isPlayer: boolean; // true for human player, false for computer
+  isPlayer: boolean;
   color: string;
 }
 
@@ -226,7 +226,7 @@ class GameTracker {
   resumeGame(): void {
     if (this._isPaused) {
       // Add the paused time to the total paused duration
-      this._pausedDuration += (Date.now() - this._pauseTime);
+      this._pausedDuration += Date.now() - this._pauseTime;
       this._isPaused = false;
     }
   }

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { GameState, GameMode } from "../types/game";
 import Game from "./game";
 import { resetGrid } from "../game/grid";
-import { tracker } from "../game/tracker";
-import { GAME_CONFIG } from "../game/config";
+import { tracker } from "../game/hooks/tracker";
+import { GAME_CONFIG } from "../game/core/config";
 import {
   initializePlayers,
   startEngine,
@@ -45,7 +45,7 @@ export default function Home() {
         }
       }
     };
-    
+
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -146,7 +146,8 @@ export default function Home() {
       {/* Game Content */}
       <div className="relative z-10 w-full h-full flex items-center justify-center">
         {/* Game HUD - Show during gameplay and when paused */}
-        {(gameState === GameState.PLAYING || gameState === GameState.PAUSED) && (
+        {(gameState === GameState.PLAYING ||
+          gameState === GameState.PAUSED) && (
           <>
             <GameHUD
               timeElapsedMs={timeElapsedMs}
@@ -157,7 +158,8 @@ export default function Home() {
         )}
 
         {/* Game Screen - Show during gameplay and when paused */}
-        {(gameState === GameState.PLAYING || gameState === GameState.PAUSED) && <Game mode={gameMode} />}
+        {(gameState === GameState.PLAYING ||
+          gameState === GameState.PAUSED) && <Game mode={gameMode} />}
 
         {/* Start Screen */}
         {gameState === GameState.START && (
@@ -166,8 +168,8 @@ export default function Home() {
 
         {/* Pause Screen */}
         {gameState === GameState.PAUSED && (
-          <PauseScreen 
-            onReturnToMenu={handleGameRestart} 
+          <PauseScreen
+            onReturnToMenu={handleGameRestart}
             onResume={() => {
               // Resume the game by calling the engine's resumeGame function
               resumeGame();

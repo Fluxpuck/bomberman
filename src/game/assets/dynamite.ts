@@ -1,4 +1,4 @@
-import { BOMB_CONFIG } from "./config";
+import { BOMB_CONFIG } from "../core/config";
 
 /**
  * Creates a dynamite element sized to fit within a cell

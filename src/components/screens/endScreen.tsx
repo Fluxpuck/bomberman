@@ -1,6 +1,6 @@
 import React from "react";
-import { GAME_CONFIG } from "@/game/config";
-import { GameStats, PlayerStats } from "../../game/tracker";
+import { GAME_CONFIG } from "@/game/core/config";
+import { GameStats, PlayerStats } from "../../game/hooks/tracker";
 import { GameState } from "../../types/game";
 
 export interface EndScreenProps {

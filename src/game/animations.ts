@@ -3,12 +3,13 @@ import {
   GRID_PATTERN,
   SCORE_CONFIG,
   POWERUP_CONFIG,
-} from "./config";
+} from "./core/config";
 import type { GridPosition } from "../types/game";
-import { createDynamite } from "./dynamite";
-import { createPowerUp, hasPowerup, PowerupType } from "./powerup";
-import { tracker } from "./tracker";
-import { playSound } from "./sound";
+import { createDynamite } from "./assets/dynamite";
+import { createPowerUp, PowerupType } from "./assets/powerups";
+import { hasPowerup } from "./powerup";
+import { tracker } from "./hooks/tracker";
+import { playSound } from "./hooks/sound";
 
 // Track bomb timers to prevent double explosions
 const bombTimers: Map<string, number> = new Map();

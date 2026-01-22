@@ -1,5 +1,5 @@
-import { GRID_PATTERN } from "./config";
-import { createSolidBlock, createBarrelBlock } from "./blocks";
+import { GRID_PATTERN } from "./core/config";
+import { createSolidBlock, createBarrelBlock } from "./assets/blocks";
 import { GridPosition } from "../types/game";
 
 // =========================
