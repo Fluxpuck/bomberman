@@ -5,7 +5,11 @@ import {
   POWERUP_CONFIG,
 } from "./core/config";
 import type { GridPosition } from "../types/game";
-import { createDynamite } from "./assets/dynamite";
+import {
+  createBombVisual,
+  createBlastVisual,
+  BlastReach,
+} from "./assets/dynamite";
 import { createPowerUp, PowerupType } from "./assets/powerups";
 import { hasPowerup } from "./powerup";
 import { tracker } from "./hooks/tracker";
@@ -13,6 +17,22 @@ import { playSound } from "./hooks/sound";
 
 // Track bomb timers to prevent double explosions
 const bombTimers: Map<string, number> = new Map();
+
+// Bombs that are armed but haven't exploded yet, keyed the same as
+// bombTimers. Used by the AI to know what's about to blow up (and where)
+// before it happens, so it can path away in time.
+export interface PendingBomb {
+  row: number;
+  col: number;
+  range: number;
+  ownerId?: string;
+  explodesAt: number;
+}
+const pendingBombs: Map<string, PendingBomb> = new Map();
+
+export function getPendingBombs(): PendingBomb[] {
+  return Array.from(pendingBombs.values());
+}
 
 // =========================
 // Grid helpers
@@ -48,42 +68,65 @@ function getCellFlags(grid: HTMLElement, row: number, col: number) {
   return { cell, exists, solid, barrel, powerup } as const;
 }
 
-// =========================
-// Effects
-// =========================
 /**
- * Creates an explosion puff with a quick scale/opacity animation
+ * Walks outward from `at` in all 4 directions up to `range` tiles (range
+ * counts the center tile itself, so `range - 1` tiles outward), stopping
+ * early at grid edges or solid/wall cells exactly like a real explosion
+ * does. Shared by the real explosion (armDynamite) and the AI's danger
+ * prediction so the two can never disagree about what a bomb will hit.
  */
-export function createExplosion(): HTMLDivElement {
-  const el = document.createElement("div");
-  Object.assign(el.style, {
-    width: "100%",
-    height: "100%",
-    background:
-      "radial-gradient(circle, rgba(255,237,74,0.95) 0%, rgba(255,166,0,0.85) 55%, rgba(255,94,0,0.6) 75%, rgba(255,0,0,0.0) 100%)",
-    borderRadius: "6px",
-    position: "absolute",
-    top: "0",
-    left: "0",
-    zIndex: "10",
-    pointerEvents: "none",
-  });
-  return el;
+export function computeBlast(
+  grid: HTMLElement,
+  at: GridPosition,
+  range: number
+): { affected: GridPosition[]; reach: BlastReach } {
+  const affected: GridPosition[] = [{ row: at.row, col: at.col }];
+  const outward = Math.max(0, range - 1);
+  const dirs: Array<[name: keyof BlastReach, dr: number, dc: number]> = [
+    ["up", -1, 0],
+    ["down", 1, 0],
+    ["left", 0, -1],
+    ["right", 0, 1],
+  ];
+  const reach: BlastReach = { up: 0, down: 0, left: 0, right: 0 };
+
+  for (const [name, dr, dc] of dirs) {
+    for (let step = 1; step <= outward; step++) {
+      const r = at.row + dr * step;
+      const c = at.col + dc * step;
+      const flags = getCellFlags(grid, r, c);
+
+      // Stop if we hit the edge of the grid
+      if (!flags.exists) break;
+
+      // Add this cell to affected cells
+      affected.push({ row: r, col: c });
+      reach[name] = step;
+
+      // Stop if we hit a solid wall or barrel, but continue through powerups
+      // (we include the cell in the affected list for visual effects)
+      if (flags.solid && !flags.powerup) {
+        // If it's a barrel, we want to destroy it
+        // If it's a solid wall, we want to stop the explosion
+        break;
+      }
+    }
+  }
+
+  return { affected, reach };
 }
 
 /**
- * Animates an explosion puff with a quick scale/opacity animation
+ * Predicts which cells a pending (not-yet-exploded) bomb will hit, using
+ * the exact same walking logic as a real explosion. Used by the AI for
+ * danger-avoidance, not by any gameplay/visual code path.
  */
-function animateExplosion(el: HTMLElement, duration: number) {
-  el.animate(
-    [
-      { transform: "scale(0.6)", opacity: 0.0 },
-      { transform: "scale(1)", opacity: 1.0, offset: 0.25 },
-      { transform: "scale(1.05)", opacity: 1.0, offset: 0.5 },
-      { transform: "scale(1)", opacity: 0.0 },
-    ],
-    { duration, easing: "ease-out", fill: "both" }
-  );
+export function predictBlastCells(
+  grid: HTMLElement,
+  at: GridPosition,
+  range: number
+): GridPosition[] {
+  return computeBlast(grid, at, range).affected;
 }
 
 // =========================
@@ -113,7 +156,8 @@ export function armDynamite(
   if (here.solid && !here.barrel) return;
 
   // Create the dynamite element
-  const dyn = createDynamite();
+  const cellSizePx = cell.offsetWidth || GRID_PATTERN.cellSize;
+  const dyn = createBombVisual(cellSizePx);
   cell.appendChild(dyn);
 
   // Mark as bomb and make the cell solid so it can't be walked through
@@ -131,10 +175,26 @@ export function armDynamite(
     window.clearTimeout(bombTimers.get(bombId));
   }
 
+  const range = Math.min(
+    Math.max(0, opts?.bombRange ?? BOMB_CONFIG.blastRadius ?? 0),
+    Math.max(0, BOMB_CONFIG.maxBlastRadius ?? Number.POSITIVE_INFINITY)
+  );
+
+  // Track this bomb as pending (armed but not yet exploded) so the AI can
+  // see it coming and path away in time.
+  pendingBombs.set(bombId, {
+    row: at.row,
+    col: at.col,
+    range,
+    ownerId: opts?.ownerId,
+    explodesAt: Date.now() + fuse,
+  });
+
   // After the fuse expires, explode the dynamite
   const timerId = window.setTimeout(() => {
-    // Remove this timer from tracking once it executes
+    // Remove this timer/pending-bomb entry from tracking once it executes
     bombTimers.delete(bombId);
+    pendingBombs.delete(bombId);
     if (dyn.parentElement) dyn.parentElement.removeChild(dyn); // Remove dynamite visual
 
     // Clear bomb flag and restore walkability if there's no barrel
@@ -143,43 +203,9 @@ export function armDynamite(
       cell.dataset.solid = "0";
     }
 
-    // Gather explosion cells (center + range in all directions)
-    const affected: GridPosition[] = [{ row: at.row, col: at.col }];
-    const range = Math.min(
-      Math.max(0, opts?.bombRange ?? BOMB_CONFIG.blastRadius ?? 0),
-      Math.max(0, BOMB_CONFIG.maxBlastRadius ?? Number.POSITIVE_INFINITY)
-    );
-    // Interpret range as total reach INCLUDING the center tile.
-    // Therefore, outward tiles per direction = range - 1.
-    const outward = Math.max(0, range - 1);
-    const dirs: Array<[dr: number, dc: number]> = [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
-    ];
-
-    for (const [dr, dc] of dirs) {
-      for (let step = 1; step <= outward; step++) {
-        const r = at.row + dr * step;
-        const c = at.col + dc * step;
-        const flags = getCellFlags(grid, r, c);
-
-        // Stop if we hit the edge of the grid
-        if (!flags.exists) break;
-
-        // Add this cell to affected cells
-        affected.push({ row: r, col: c });
-
-        // Stop if we hit a solid wall or barrel, but continue through powerups
-        // (we include the cell in the affected list for visual effects)
-        if (flags.solid && !flags.powerup) {
-          // If it's a barrel, we want to destroy it
-          // If it's a solid wall, we want to stop the explosion
-          break;
-        }
-      }
-    }
+    // Gather explosion cells (center + range in all directions), stopping
+    // at walls/barrels exactly like the visual does (shared helper).
+    const { affected, reach } = computeBlast(grid, at, range);
 
     // Notify detonation and apply damage timing now
     const duration = Math.max(100, BOMB_CONFIG.explodeDuration);
@@ -197,7 +223,22 @@ export function armDynamite(
     // Play explosion sound
     playSound("soundFX", "explosion", 0.5);
 
-    // Visual effect: apply explosion puffs to affected cells, destroy barrels
+    // Visual effect: single blast graphic anchored at the bomb's own cell,
+    // each arm clipped to the tiles actually reached in that direction
+    // (see docs/features/bomb-visual-upgrade.md)
+    const blast = createBlastVisual(reach, cellSizePx);
+    Object.assign(blast.style, {
+      position: "absolute",
+      left: `${cell.offsetLeft}px`,
+      top: `${cell.offsetTop}px`,
+      zIndex: "10",
+    });
+    grid.appendChild(blast);
+    window.setTimeout(() => {
+      if (blast.parentElement) blast.parentElement.removeChild(blast);
+    }, duration);
+
+    // Apply gameplay effects to affected cells (destroy barrels/crates, chain bombs)
     for (const gp of affected) {
       const target = getCell(grid, gp.row, gp.col);
       if (!target) continue;
@@ -227,6 +268,7 @@ export function armDynamite(
             window.clearTimeout(bombTimers.get(chainedBombId));
             bombTimers.delete(chainedBombId);
           }
+          pendingBombs.delete(chainedBombId);
 
           // Remove the bomb element to prevent visual duplication
           target.removeChild(bombElement);
@@ -277,23 +319,11 @@ export function armDynamite(
         if (Math.random() < dropChance) {
           const types = ["extraBomb", "increaseRange"] as PowerupType[];
           const t = types[Math.floor(Math.random() * types.length)];
-          const pu = createPowerUp(t);
+          const cellSizePx = target.offsetWidth || GRID_PATTERN.cellSize;
+          const pu = createPowerUp(t, cellSizePx);
           target.appendChild(pu);
         }
       }
-
-      // Create explosion effect
-      const puff = createExplosion();
-
-      // Add the explosion to the cell
-      // The z-index will ensure it appears below powerups
-      target.appendChild(puff);
-
-      // Animate and clean up
-      animateExplosion(puff, duration);
-      window.setTimeout(() => {
-        if (puff.parentElement) puff.parentElement.removeChild(puff);
-      }, duration);
     }
 
     window.setTimeout(() => {

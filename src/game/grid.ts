@@ -1,11 +1,12 @@
 import { GRID_PATTERN } from "./core/config";
-import { createSolidBlock, createBarrelBlock } from "./assets/blocks";
+import { createTileVisual, rescaleTileVisual } from "./assets/blocks";
+import { rescalePowerUpVisual } from "./assets/powerups";
 import { GridPosition } from "../types/game";
 
 // =========================
 // Types
 // =========================
-type CellType = "empty" | "border" | "solid" | "barrel";
+type CellType = "empty" | "border" | "solid" | "crate" | "barrel";
 
 interface CellData {
   index: number;
@@ -71,16 +72,23 @@ function isInSpawnZone(row: number, col: number): boolean {
 }
 
 /**
- * Determine if a barrel should be placed (random based on coverage)
+ * Determine if a breakable block should be placed (random based on coverage)
  */
-function shouldPlaceBarrel(row: number, col: number): boolean {
-  // Don't place barrels on borders, solid blocks, or spawn zones
+function shouldPlaceBreakable(row: number, col: number): boolean {
+  // Don't place breakables on borders, solid blocks, or spawn zones
   if (isBorderCell(row, col)) return false;
   if (isSolidPatternCell(row, col)) return false;
   if (isInSpawnZone(row, col)) return false;
 
   const coverage = Math.max(0, Math.min(1, GRID_PATTERN.coverage ?? 0));
   return Math.random() < coverage;
+}
+
+/**
+ * Pick which breakable visual to use for a placed breakable block (even split)
+ */
+function pickBreakableType(): "crate" | "barrel" {
+  return Math.random() < 0.5 ? "crate" : "barrel";
 }
 
 // =========================
@@ -104,8 +112,8 @@ function generateGridLayout(): GridLayout {
       type = "border";
     } else if (isSolidPatternCell(row, col)) {
       type = "solid";
-    } else if (shouldPlaceBarrel(row, col)) {
-      type = "barrel";
+    } else if (shouldPlaceBreakable(row, col)) {
+      type = pickBreakableType();
     }
 
     cells.push({ index: i, row, col, type });
@@ -162,13 +170,21 @@ function createCellElement(cellData: CellData): HTMLDivElement {
   switch (cellData.type) {
     case "border":
     case "solid":
-      cell.appendChild(createSolidBlock());
+      cell.appendChild(createTileVisual("wall", cellSize));
       cell.dataset.solid = "1";
       break;
-    case "barrel":
-      cell.appendChild(createBarrelBlock());
+    case "crate":
+      cell.appendChild(createTileVisual("crate", cellSize));
       cell.dataset.solid = "1";
       cell.dataset.barrel = "1";
+      break;
+    case "barrel":
+      cell.appendChild(createTileVisual("barrel", cellSize));
+      cell.dataset.solid = "1";
+      cell.dataset.barrel = "1";
+      break;
+    case "empty":
+      cell.appendChild(createTileVisual("floor", cellSize));
       break;
   }
 
@@ -271,6 +287,14 @@ export function updateGridLayout(
     const el = grid.children[i] as HTMLDivElement;
     el.style.width = `${cell}px`;
     el.style.height = `${cell}px`;
+
+    const tileVisual = el.firstElementChild as HTMLDivElement | null;
+    if (tileVisual) rescaleTileVisual(tileVisual, cell);
+
+    for (const child of Array.from(el.children)) {
+      const el2 = child as HTMLDivElement;
+      if (el2.dataset.powerup !== undefined) rescalePowerUpVisual(el2, cell);
+    }
   }
 }
 

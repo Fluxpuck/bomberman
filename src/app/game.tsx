@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { grid, updateGridLayout } from "../game/grid";
-import { Player, characterManager } from "../game/player";
+import { characterManager } from "../game/player";
 import { GRID_PATTERN } from "../game/core/config";
 import { GameMode } from "../types/game";
-import { createCharacter } from "../game/assets/character";
+import { createBomberVisual, BomberState } from "../game/assets/character";
 
 interface GameProps {
   mode: GameMode;
 }
+
+// Colors swapped in briefly, in place of a character's own palette, while
+// blinking to signal a hit.
+const HIT_FLASH = { accent: "#e74c3c", dark: "#922b21", light: "#f5b7b1" };
 
 export default function Game({ mode }: GameProps) {
   const gameContainerRef = useRef<HTMLDivElement>(null);
@@ -68,34 +72,40 @@ export default function Game({ mode }: GameProps) {
     characters.forEach((char) => {
       if (!char.isAlive()) return;
 
+      const cellSize = GRID_PATTERN.cellSize;
+      const isShowingDamage = char.isShowingDamageAnimation();
+      const state: BomberState = isShowingDamage
+        ? "hurt"
+        : char.winning
+        ? "win"
+        : char.isWalking()
+        ? "walk"
+        : "idle";
+
+      // Blink red for the whole immunity window after a hit, so it stays
+      // clear the character just lost a life and can't be hit again yet.
+      const blinkOn =
+        char.isImmune() && Math.floor(Date.now() / 100) % 2 === 0;
+
       // Create character element using the character.ts module
-      const charElement = createCharacter();
+      const charElement = createBomberVisual(
+        blinkOn ? HIT_FLASH.accent : char.color,
+        blinkOn ? HIT_FLASH.dark : char.darkColor,
+        blinkOn ? HIT_FLASH.light : char.lightColor,
+        state,
+        char.facing,
+        cellSize
+      );
       charElement.dataset.character = char.id;
 
-      const cellSize = GRID_PATTERN.cellSize;
-
-      // Check if character is showing damage animation
-      const isShowingDamage = char.isShowingDamageAnimation();
-
-      // Apply character styling and positioning
-      const charSize = cellSize - 8;
+      // Apply positioning
       Object.assign(charElement.style, {
-        backgroundColor: isShowingDamage ? "#e74c3c" : char.color,
-        left: `${char.position.x + (cellSize - charSize) / 2}px`,
-        top: `${char.position.y + (cellSize - charSize) / 2}px`,
+        position: "absolute",
+        left: `${char.position.x}px`,
+        top: `${char.position.y}px`,
         transition: isShowingDamage ? "none" : "all 0.5s ease",
-        boxShadow: isShowingDamage ? "0 0 6px 3px rgba(231, 76, 60, 0.5)" : "",
         zIndex: "10",
       });
-
-      // // Add character type indicator
-      // const label = document.createElement("div");
-      // label.textContent = char instanceof Player ? "P" : "C";
-      // label.style.fontSize = "14px";
-      // label.style.fontWeight = "bold";
-      // label.style.color = "#fff";
-      // label.style.zIndex = "11";
-      // charElement.appendChild(label);
 
       grid.appendChild(charElement);
     });

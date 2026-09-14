@@ -17,6 +17,11 @@ export const PLAYER_CONFIG = {
   defaultInventory: 1,
 };
 
+export const CHARACTER_CONFIG = {
+  // Must match the CSS transition duration used for character movement in game.tsx
+  moveTransitionMs: 500,
+};
+
 export const BOMB_CONFIG = {
   fuseDuration: 1000,
   explodeDuration: 750,

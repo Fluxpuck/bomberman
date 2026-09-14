@@ -2,7 +2,7 @@ import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./core/config";
 import { grid, isWalkable, gridRows, gridCols } from "./grid";
 import { Character, Player, Computer, characterManager } from "./player";
 import { tracker } from "./hooks/tracker";
-import { armDynamite } from "./animations";
+import { armDynamite, getPendingBombs, predictBlastCells } from "./animations";
 import { checkPowerupPickup } from "./powerup";
 import { playSound } from "./hooks/sound";
 import { Direction, GridPosition, Position, GameState } from "../types/game";
@@ -408,6 +408,34 @@ function checkBlastCellDamage(character: Character): void {
 }
 
 /**
+ * Cells that are either actively exploding right now, or about to be hit by
+ * a bomb that's still ticking. Keyed "row,col" for O(1) lookup. Used by the
+ * AI for danger-avoidance.
+ */
+export function getDangerCells(): Set<string> {
+  const danger = new Set<string>();
+
+  const currentTime = Date.now();
+  for (const blastCell of activeBlastCells) {
+    if (currentTime > blastCell.endTime) continue;
+    danger.add(`${blastCell.position.row},${blastCell.position.col}`);
+  }
+
+  for (const pending of getPendingBombs()) {
+    const cells = predictBlastCells(
+      grid,
+      { row: pending.row, col: pending.col },
+      pending.range
+    );
+    for (const cell of cells) {
+      danger.add(`${cell.row},${cell.col}`);
+    }
+  }
+
+  return danger;
+}
+
+/**
  * Clean up expired blast cells
  */
 function cleanupBlastCells(): void {
@@ -523,6 +551,10 @@ function handleWin(winnerId: string) {
   if (gameState !== GameState.PLAYING) return;
 
   gameState = GameState.WIN;
+  const winner = characterManager.get(winnerId);
+  if (winner) {
+    winner.winning = true;
+  }
   if (onWin) {
     onWin(winnerId);
   }
@@ -692,7 +724,9 @@ export function initializePlayers() {
   const playerSpawn = getCornerSpawn("tl");
   const player = new Player(
     "player-1",
-    "#4A90E2", // Blue
+    "#4aa3ff", // Azure
+    "#12457f",
+    "#cfe8ff",
     gridToPixel(playerSpawn),
     playerSpawn,
     PLAYER_CONFIG.defaultLives
@@ -705,7 +739,9 @@ export function initializePlayers() {
     const computerSpawn = getCornerSpawn("tr");
     const computer1 = new Computer(
       "computer-1",
-      "#E74C3C", // Red
+      "#ff5f5f", // Ember
+      "#a62a2a",
+      "#ffd3cf",
       gridToPixel(computerSpawn),
       computerSpawn,
       PLAYER_CONFIG.defaultLives
@@ -718,7 +754,9 @@ export function initializePlayers() {
     const computerSpawn = getCornerSpawn("bl");
     const computer2 = new Computer(
       "computer-2",
-      "#F39C12", // Orange
+      "#f5a623", // Amber
+      "#a96a06",
+      "#ffe6b8",
       gridToPixel(computerSpawn),
       computerSpawn,
       PLAYER_CONFIG.defaultLives
@@ -731,7 +769,9 @@ export function initializePlayers() {
     const computerSpawn = getCornerSpawn("br");
     const computer3 = new Computer(
       "computer-3",
-      "#9B59B6", // Purple
+      "#b45ddb", // Violet
+      "#6f2f96",
+      "#ecd4ff",
       gridToPixel(computerSpawn),
       computerSpawn,
       PLAYER_CONFIG.defaultLives
