@@ -2,6 +2,11 @@
   "name": "lofi-bomberman",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "yarn@4.12.0",
+  "engines": {
+    "node": ">=26 <27",
+    "yarn": ">=4 <5"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
