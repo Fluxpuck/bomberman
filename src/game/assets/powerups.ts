@@ -43,7 +43,7 @@ export function rescalePowerUpVisual(mount: HTMLDivElement, cellSizePx: number):
 
 /**
  * Creates a power-up element, scaled from the source 120px design box down
- * to the live cell size. See docs/features/powerup-visual-upgrade.md.
+ * to the live cell size.
  */
 export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivElement {
   ensureKeyframes();

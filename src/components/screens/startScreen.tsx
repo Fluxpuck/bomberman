@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-
-type GameMode = "solo" | "2 players" | "3 players" | "4 players";
+import { useState } from "react";
+import { GameMode } from "../../types/game";
 
 interface StartScreenProps {
   onStart: (mode: GameMode) => void;
+  onMultiplayer: () => void;
 }
 
-export function StartScreen({ onStart }: StartScreenProps) {
+export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
   const [selectedMode, setSelectedMode] = useState<GameMode>("solo");
 
   // Game mode options
@@ -18,6 +18,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
     "2 players": { bg: "#60a5fa", border: "#1e3a8a", text: "#ffffff" },
     "3 players": { bg: "#f59e0b", border: "#b45309", text: "#ffffff" },
     "4 players": { bg: "#ef4444", border: "#991b1b", text: "#ffffff" },
+    online: { bg: "#a78bfa", border: "#5b21b6", text: "#ffffff" },
   };
 
   return (
@@ -30,7 +31,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         </div>
 
         {/* Game Mode Selection */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="grid grid-cols-2 gap-2">
             {gameModes.map((mode) => {
               return (
@@ -52,6 +53,22 @@ export function StartScreen({ onStart }: StartScreenProps) {
               );
             })}
           </div>
+        </div>
+
+        {/* Multiplayer button */}
+        <div className="mb-2">
+          <button
+            className="w-full py-3 px-4 rounded-lg font-bold text-center transition-all"
+            style={{
+              backgroundColor: modeColors.online.bg,
+              borderColor: modeColors.online.border,
+              color: modeColors.online.text,
+              border: `2px solid ${modeColors.online.border}`,
+            }}
+            onClick={onMultiplayer}
+          >
+            Multiplayer (Online)
+          </button>
         </div>
 
         {/* Game Controls */}

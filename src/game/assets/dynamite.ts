@@ -23,7 +23,6 @@ function ensureKeyframes(): void {
 /**
  * Creates the placed/ticking bomb visual for a cell. Kept tagged with the
  * "dynamite" class so armDynamite's chain-detonation lookup keeps finding it.
- * See docs/features/bomb-visual-upgrade.md.
  */
 export function createBombVisual(cellSizePx: number): HTMLDivElement {
   ensureKeyframes();
@@ -132,7 +131,6 @@ export interface BlastReach {
  * (e.g. at an indestructible wall) instead of always drawing a fixed length.
  * Caller is responsible for positioning it (absolute, at the bomb's cell
  * top-left) and removing it after the explosion duration.
- * See docs/features/bomb-visual-upgrade.md.
  */
 export function createBlastVisual(
   reach: BlastReach,

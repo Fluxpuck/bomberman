@@ -15,50 +15,21 @@ export enum Direction {
   RIGHT = "RIGHT",
 }
 
-export enum CellType {
-  EMPTY = "EMPTY",
-  WALL = "WALL",
-  DESTRUCTIBLE = "DESTRUCTIBLE",
-}
+/** Grid-cell delta for each movement direction. */
+export const DIRECTION_DELTAS: Record<Direction, { row: number; col: number }> = {
+  [Direction.UP]: { row: -1, col: 0 },
+  [Direction.DOWN]: { row: 1, col: 0 },
+  [Direction.LEFT]: { row: 0, col: -1 },
+  [Direction.RIGHT]: { row: 0, col: 1 },
+};
 
 export enum GameState {
   START = "START",
+  LOBBY = "LOBBY",
   PLAYING = "PLAYING",
   PAUSED = "PAUSED",
   GAME_OVER = "GAME_OVER",
   WIN = "WIN",
 }
 
-export type GameMode = "solo" | "2 players" | "3 players" | "4 players";
-
-export interface Player {
-  position: Position;
-  gridPosition: GridPosition;
-  alive: boolean;
-  speed: number;
-}
-
-export interface Bomb {
-  id: string;
-  position: Position;
-  gridPosition: GridPosition;
-  timer: number;
-  explosionRadius: number;
-  exploded: boolean;
-}
-
-export interface Explosion {
-  id: string;
-  cells: GridPosition[];
-  timer: number;
-}
-
-export interface GameConfig {
-  gridRows: number;
-  gridCols: number;
-  cellSize: number;
-  bombTimer: number;
-  explosionDuration: number;
-  explosionRadius: number;
-  playerSpeed: number;
-}
+export type GameMode = "solo" | "2 players" | "3 players" | "4 players" | "online";

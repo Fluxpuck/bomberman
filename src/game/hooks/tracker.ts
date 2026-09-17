@@ -1,12 +1,13 @@
-import { PLAYER_CONFIG, BOMB_CONFIG, SCORE_CONFIG } from "../core/config";
-import { Character, Player, Computer } from "../player";
 import { GridPosition, Position } from "../../types/game";
+import { SCORE_CONFIG } from "../core/config";
+import { Character, Computer, Player } from "../player";
 
 // =========================
 // Player Stats Interface
 // =========================
 export interface PlayerStats {
   id: string;
+  name: string;
   lives: number;
   position: Position;
   gridPosition: GridPosition;
@@ -118,10 +119,6 @@ class PlayerTracker {
     this._activeBombs = Math.max(0, this._activeBombs - 1);
   }
 
-  canPlaceBomb(): boolean {
-    return this._activeBombs < this._character.inventory;
-  }
-
   // Inventory management
 
   addBomb(): void {
@@ -170,6 +167,7 @@ class PlayerTracker {
   getStats(): PlayerStats {
     return {
       id: this.id,
+      name: this._character.name,
       lives: this.lives,
       position: this.position,
       gridPosition: this.gridPosition,
@@ -302,48 +300,6 @@ class GameTracker {
 
   get totalKills(): number {
     return this.getPlayers().reduce((total, player) => total + player.kills, 0);
-  }
-
-  // Bomb hit detection and damage application
-  applyExplosionDamage(
-    affectedCells: GridPosition[],
-    sourcePlayerId: string
-  ): void {
-    // Find which players are in the explosion area
-    for (const player of this.getPlayers()) {
-      if (!player.isAlive) continue;
-      if (player.isImmune()) continue;
-
-      const isHit = affectedCells.some(
-        (cell) =>
-          cell.row === player.gridPosition.row &&
-          cell.col === player.gridPosition.col
-      );
-
-      if (isHit) {
-        // Apply damage to the hit player
-        player.decrementLife();
-
-        // Set player immune after taking damage
-        player.setImmune();
-
-        // If player died from this hit, credit the kill to the source player
-        if (!player.isAlive && player.id !== sourcePlayerId) {
-          const sourcePlayer = this.getPlayer(sourcePlayerId);
-          if (sourcePlayer) {
-            sourcePlayer.incrementKills();
-          }
-        }
-      }
-    }
-  }
-
-  // Block destruction tracking
-  recordBlockDestruction(count: number, playerId: string): void {
-    const player = this.getPlayer(playerId);
-    if (player) {
-      player.incrementBlocksDestroyed(count);
-    }
   }
 
   // Get complete game stats

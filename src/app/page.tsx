@@ -1,99 +1,265 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { GameState, GameMode } from "../types/game";
-import Game from "./game";
-import { resetGrid } from "../game/grid";
-import { tracker } from "../game/hooks/tracker";
+import { useEffect, useRef, useState } from "react";
+import { AudioController } from "../components/AudioController";
+import { EndScreen } from "../components/screens/endScreen";
+import { GameHUD } from "../components/screens/gameHud";
+import { LobbyScreen } from "../components/screens/lobbyScreen";
+import { PauseScreen } from "../components/screens/pauseScreen";
+import { PlayersHUD } from "../components/screens/playerHud";
+import { StartScreen } from "../components/screens/startScreen";
 import { GAME_CONFIG } from "../game/core/config";
 import {
+  eliminatePlayer,
+  getGameState,
   initializePlayers,
-  startEngine,
-  stopEngine,
   pauseGame,
   resumeGame,
+  setDesiredPlayersCount,
   setOnPlayerDead,
   setOnTimeOver,
   setOnWin,
-  setDesiredPlayersCount,
+  setRoster,
+  startEngine,
+  stopEngine
 } from "../game/engine";
-import { StartScreen } from "../components/screens/startScreen";
-import { PauseScreen } from "../components/screens/pauseScreen";
-import { EndScreen } from "../components/screens/endScreen";
-import { GameHUD } from "../components/screens/gameHud";
-import { PlayersHUD } from "../components/screens/playerHud";
-import { AudioController } from "../components/AudioController";
+import { resetGrid } from "../game/grid";
+import { PlayerStats, tracker } from "../game/hooks/tracker";
+import {
+  getLatestGameOver,
+  getLatestStats,
+  getLatestTimeElapsedMs,
+  handleHostPayload,
+  startGuestView,
+  stopGuestView,
+} from "../game/net/guest";
+import {
+  handleGuestPayload,
+  sendGameOver,
+  sendStart,
+  startHosting,
+  stopHosting,
+} from "../game/net/host";
+import { roomClient } from "../game/net/roomClient";
+import { GameMode, GameState } from "../types/game";
+import { GamePayload, RoomPlayer, RosterEntry } from "../types/multiplayer";
+import Game from "./game";
 
 export default function Home() {
   // Game state
   const [gameMode, setGameMode] = useState<GameMode>("solo");
   const [gameState, setGameState] = useState<GameState>(GameState.START);
   const [timeElapsedMs, setTimeElapsedMs] = useState(0);
-  const [winner, setWinner] = useState<any>(undefined);
+  const [winner, setWinner] = useState<PlayerStats | undefined>(undefined);
 
-  // Handle keyboard events for pausing with Escape key
+  // Lobby state
+  const [lobbyState, setLobbyState] = useState<{
+    code: string | null;
+    players: RoomPlayer[];
+    isHost: boolean;
+    error: string | null;
+    connecting: boolean;
+    myName: string;
+  }>({
+    code: null,
+    players: [],
+    isHost: false,
+    error: null,
+    connecting: false,
+    myName: "",
+  });
+
+  // True when this client is an online guest (joined someone else's room).
+  const [isGuest, setIsGuest] = useState(false);
+
+  // The host's roster, kept in a ref so the PLAYING effect and relay handler
+  // can read it without re-subscribing.
+  const rosterRef = useRef<RosterEntry[]>([]);
+
+  // =========================
+  // Relay dispatch (kept in a ref so the roomClient callback always calls
+  // the latest version with current isGuest/gameMode values, avoiding a
+  // stale closure from the mount-time useEffect).
+  // =========================
+  const handleRelayRef = useRef<(from: number, payload: GamePayload) => void>(
+    () => {}
+  );
+
+  const handleRelay = (from: number, payload: GamePayload) => {
+    if (isGuest) {
+      // Guest receives host payloads.
+      if (payload.t === "start") {
+        startGuestView(payload);
+        setGameState(GameState.PLAYING);
+      } else if (payload.t === "gameOver") {
+        setGameState(payload.state === "WIN" ? GameState.WIN : GameState.GAME_OVER);
+      } else {
+        handleHostPayload(payload);
+      }
+    } else {
+      // Host receives guest input.
+      handleGuestPayload(from, payload, rosterRef.current);
+    }
+  };
+  handleRelayRef.current = handleRelay;
+
+  // =========================
+  // Room client event wiring
+  // =========================
+  useEffect(() => {
+    roomClient.setOnRoom((code, players) => {
+      // Mid-game guest disconnect (host only): eliminate the departed remote
+      // player so they don't linger as a frozen character. rosterRef is only
+      // populated on the host, so this block never runs on guests.
+      if (
+        getGameState() === GameState.PLAYING &&
+        rosterRef.current.length > 0
+      ) {
+        const remainingSlots = new Set(players.map((p) => p.slot));
+        rosterRef.current = rosterRef.current.filter((entry) => {
+          const isDepartedRemote =
+            entry.control === "remote" && !remainingSlots.has(entry.slot);
+          if (isDepartedRemote) eliminatePlayer(entry.id);
+          return !isDepartedRemote;
+        });
+      }
+
+      const mySlot = roomClient.getSlot();
+      const me = players.find((p) => p.slot === mySlot);
+      setLobbyState((prev) => ({
+        ...prev,
+        code,
+        players,
+        isHost: me?.isHost ?? false,
+        myName: me?.name ?? prev.myName,
+        error: null,
+        connecting: false,
+      }));
+    });
+
+    roomClient.setOnError((message) => {
+      setLobbyState((prev) => ({ ...prev, error: message, connecting: false }));
+    });
+
+    roomClient.setOnHostLeft(() => {
+      // If we were mid-game, stop the guest view and return to the start.
+      stopGuestView();
+      setIsGuest(false);
+      setGameState(GameState.START);
+      setLobbyState((prev) => ({
+        ...prev,
+        code: null,
+        players: [],
+        isHost: false,
+        error: "Host left the game",
+        connecting: false,
+      }));
+    });
+
+    roomClient.setOnRelay((from, payload) => {
+      handleRelayRef.current(from, payload);
+    });
+
+    return () => {
+      roomClient.setOnRoom(null);
+      roomClient.setOnError(null);
+      roomClient.setOnHostLeft(null);
+      roomClient.setOnRelay(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // =========================
+  // Escape key (pause) — disabled in online games
+  // =========================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        // Toggle between paused and playing states
-        if (gameState === GameState.PLAYING) {
-          pauseGame();
-          setGameState(GameState.PAUSED);
-        } else if (gameState === GameState.PAUSED) {
-          resumeGame();
-          setGameState(GameState.PLAYING);
-        }
+      if (e.key !== "Escape") return;
+      if (gameMode === "online") return; // online games can't pause
+
+      if (gameState === GameState.PLAYING) {
+        pauseGame();
+        setGameState(GameState.PAUSED);
+      } else if (gameState === GameState.PAUSED) {
+        resumeGame();
+        setGameState(GameState.PLAYING);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [gameState]);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [gameState, gameMode]);
 
-  // Initialize game when mode changes
+  // =========================
+  // Game lifecycle (PLAYING effect)
+  // =========================
   useEffect(() => {
     if (gameState !== GameState.PLAYING) return;
 
-    // Initialize players based on game mode
+    if (gameMode === "online" && isGuest) {
+      // Guest: no engine to start. The guest view was already started by the
+      // relay handler. Just poll the latest snapshot for the HUD/time.
+      const timeInterval = setInterval(() => {
+        setTimeElapsedMs(getLatestTimeElapsedMs());
+      }, 100);
+
+      return () => {
+        clearInterval(timeInterval);
+      };
+    }
+
+    // Host or solo/local: initialize players, start the engine, wire callbacks.
     initializePlayers();
 
-    // Set up event handlers
     setOnPlayerDead(() => {
       setGameState(GameState.GAME_OVER);
+      if (gameMode === "online") {
+        sendGameOver(getGameState());
+      }
     });
 
     setOnTimeOver(() => {
       setGameState(GameState.GAME_OVER);
+      if (gameMode === "online") {
+        sendGameOver(getGameState());
+      }
     });
 
     setOnWin((winnerId) => {
-      // Get the full player stats object for the winner
       const winnerStats = tracker.getPlayer(winnerId)?.getStats();
       setWinner(winnerStats);
       setGameState(GameState.WIN);
+      if (gameMode === "online") {
+        sendGameOver(getGameState());
+      }
     });
 
-    // Start the game engine
     startEngine();
 
-    // Update time elapsed
+    // For online host: start relaying snapshots + blasts.
+    if (gameMode === "online" && !isGuest) {
+      startHosting(rosterRef.current);
+    }
+
     const timeInterval = setInterval(() => {
       setTimeElapsedMs(tracker.timeElapsedMs);
     }, 100);
 
-    // Clean up
     return () => {
       stopEngine();
+      if (gameMode === "online" && !isGuest) {
+        stopHosting();
+      }
       clearInterval(timeInterval);
     };
-  }, [gameState, gameMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState, gameMode, isGuest]);
 
-  console.log("gameState", gameState);
-
-  // Handle game start
+  // =========================
+  // Start screen handlers (solo/local)
+  // =========================
   const handleGameStart = (mode: GameMode) => {
+    setIsGuest(false);
     setGameMode(mode);
     setGameState(GameState.PLAYING);
     setTimeElapsedMs(0);
@@ -101,7 +267,6 @@ export default function Home() {
     tracker.reset();
     tracker.startGame();
 
-    // Set the desired player count based on the game mode
     switch (mode) {
       case "solo":
         setDesiredPlayersCount(1);
@@ -120,17 +285,195 @@ export default function Home() {
     }
   };
 
-  // Handle game restart
+  // =========================
+  // Lobby handlers
+  // =========================
+  const handleMultiplayer = () => {
+    setGameState(GameState.LOBBY);
+    setLobbyState({
+      code: null,
+      players: [],
+      isHost: false,
+      error: null,
+      connecting: false,
+      myName: "",
+    });
+    setIsGuest(false);
+  };
+
+  const handleCreateRoom = async (name: string) => {
+    setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
+    try {
+      await roomClient.connect();
+      roomClient.createRoom(name);
+    } catch {
+      setLobbyState((prev) => ({
+        ...prev,
+        connecting: false,
+        error: "Could not connect to the server",
+      }));
+    }
+  };
+
+  const handleJoinRoom = async (code: string, name: string) => {
+    setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
+    setIsGuest(true);
+    setGameMode("online");
+    try {
+      await roomClient.connect();
+      roomClient.joinRoom(code, name);
+    } catch {
+      setLobbyState((prev) => ({
+        ...prev,
+        connecting: false,
+        error: "Could not connect to the server",
+      }));
+      setIsGuest(false);
+      setGameMode("solo");
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    roomClient.leaveRoom();
+    setIsGuest(false);
+    setLobbyState({
+      code: null,
+      players: [],
+      isHost: false,
+      error: null,
+      connecting: false,
+      myName: "",
+    });
+  };
+
+  const handleLobbyBack = () => {
+    roomClient.reset();
+    stopGuestView();
+    setIsGuest(false);
+    setGameState(GameState.START);
+    setLobbyState({
+      code: null,
+      players: [],
+      isHost: false,
+      error: null,
+      connecting: false,
+      myName: "",
+    });
+  };
+
+  // =========================
+  // Host: start the online game
+  // =========================
+  const handleStartOnlineGame = (fillBots: boolean) => {
+    const mySlot = roomClient.getSlot();
+    const roster: RosterEntry[] = lobbyState.players.map((p) => ({
+      id: `player-${p.slot + 1}`,
+      name: p.name,
+      control: p.slot === mySlot ? "local" : "remote",
+      slot: p.slot,
+    }));
+
+    // Fill remaining slots with bots if requested.
+    if (fillBots) {
+      let botIndex = 1;
+      for (let slot = roster.length; slot < 4; slot++) {
+        roster.push({
+          id: `computer-${botIndex}`,
+          name: `Computer ${botIndex}`,
+          control: "computer",
+          slot,
+        });
+        botIndex++;
+      }
+    }
+
+    rosterRef.current = roster;
+
+    // Lock the room so no one else can join mid-game.
+    roomClient.lockRoom();
+
+    // Reset the grid and tracker for a fresh round.
+    resetGrid();
+    tracker.reset();
+    tracker.startGame();
+    setRoster(roster);
+
+    // Tell guests to build the grid + characters.
+    sendStart(roster);
+
+    // Switch to playing; the PLAYING effect initializes players + engine.
+    setGameMode("online");
+    setIsGuest(false);
+    setWinner(undefined);
+    setTimeElapsedMs(0);
+    setGameState(GameState.PLAYING);
+  };
+
+  // =========================
+  // Restart / return to menu
+  // =========================
   const handleGameRestart = () => {
+    if (gameMode === "online") {
+      // Leave the room and return to the start screen.
+      roomClient.reset();
+      stopGuestView();
+      stopHosting();
+      setIsGuest(false);
+    }
     setGameState(GameState.START);
     setTimeElapsedMs(0);
     setWinner(undefined);
   };
 
-  // Get player stats for HUD
+  const handlePlayAgain = () => {
+    if (gameMode === "online" && isGuest) return; // guests can't restart
+
+    if (gameMode === "online" && !isGuest) {
+      // Host restarts with the same roster.
+      resetGrid();
+      tracker.reset();
+      tracker.startGame();
+      setRoster(rosterRef.current);
+      sendStart(rosterRef.current);
+      setWinner(undefined);
+      setTimeElapsedMs(0);
+      setGameState(GameState.PLAYING);
+      return;
+    }
+
+    // Solo/local: reuse the existing flow.
+    handleGameStart(gameMode);
+  };
+
+  // =========================
+  // HUD stats
+  // =========================
   const getPlayerStats = () => {
+    if (gameMode === "online" && isGuest) {
+      return getLatestStats();
+    }
     return tracker.getPlayers().map((player) => player.getStats());
   };
+
+  // =========================
+  // End screen winner/stats
+  // =========================
+  const getEndWinner = () => {
+    if (gameMode === "online" && isGuest) {
+      return getLatestGameOver()?.winner;
+    }
+    return winner;
+  };
+
+  const getEndGameStats = () => {
+    if (gameMode === "online" && isGuest) {
+      return getLatestGameOver()?.gameStats ?? tracker.getGameStats();
+    }
+    return tracker.getGameStats();
+  };
+
+  // Whether to show the "Play Again" button (host or solo/local only).
+  const canPlayAgain = !(gameMode === "online" && isGuest);
 
   return (
     <main className="min-h-screen flex items-center justify-center relative bg-gray-900 text-white overflow-hidden">
@@ -159,11 +502,28 @@ export default function Home() {
 
         {/* Game Screen - Show during gameplay and when paused */}
         {(gameState === GameState.PLAYING ||
-          gameState === GameState.PAUSED) && <Game mode={gameMode} />}
+          gameState === GameState.PAUSED) && <Game />}
 
         {/* Start Screen */}
         {gameState === GameState.START && (
-          <StartScreen onStart={handleGameStart} />
+          <StartScreen onStart={handleGameStart} onMultiplayer={handleMultiplayer} />
+        )}
+
+        {/* Lobby Screen */}
+        {gameState === GameState.LOBBY && (
+          <LobbyScreen
+            roomCode={lobbyState.code}
+            players={lobbyState.players}
+            isHost={lobbyState.isHost}
+            myName={lobbyState.myName}
+            error={lobbyState.error}
+            connecting={lobbyState.connecting}
+            onCreate={handleCreateRoom}
+            onJoin={handleJoinRoom}
+            onLeave={handleLeaveRoom}
+            onStart={handleStartOnlineGame}
+            onBack={handleLobbyBack}
+          />
         )}
 
         {/* Pause Screen */}
@@ -171,7 +531,6 @@ export default function Home() {
           <PauseScreen
             onReturnToMenu={handleGameRestart}
             onResume={() => {
-              // Resume the game by calling the engine's resumeGame function
               resumeGame();
               setGameState(GameState.PLAYING);
             }}
@@ -182,11 +541,12 @@ export default function Home() {
         {(gameState === GameState.GAME_OVER || gameState === GameState.WIN) && (
           <EndScreen
             gameState={gameState}
-            winner={winner}
+            winner={getEndWinner()}
+            players={getPlayerStats()}
             timeLeft={GAME_CONFIG.timeLimit * 1000 - timeElapsedMs}
-            gameStats={tracker.getGameStats()}
+            gameStats={getEndGameStats()}
             onReturnToMenu={handleGameRestart}
-            onPlayAgain={() => handleGameStart(gameMode)}
+            onPlayAgain={canPlayAgain ? handlePlayAgain : undefined}
           />
         )}
       </div>

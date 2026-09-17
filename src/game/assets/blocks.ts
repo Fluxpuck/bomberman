@@ -100,7 +100,7 @@ export function rescaleTileVisual(mount: HTMLDivElement, cellSizePx: number): vo
 
 /**
  * Builds a tile's visual (floor/wall/crate/barrel), scaled from the source
- * 120px design box down to the live cell size. See docs/features/tiles-visual-upgrade.md.
+ * 120px design box down to the live cell size.
  */
 export function createTileVisual(kind: TileKind, cellSizePx: number): HTMLDivElement {
   const scale = cellSizePx / 120;

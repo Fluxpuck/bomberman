@@ -1,11 +1,33 @@
-import { Direction, GridPosition, Position } from "../types/game";
 import {
-  PLAYER_CONFIG,
+  Direction,
+  DIRECTION_DELTAS,
+  GridPosition,
+  Position
+} from "../types/game";
+import {
   BOMB_CONFIG,
-  GRID_PATTERN,
   CHARACTER_CONFIG,
+  GRID_PATTERN,
+  PLAYER_CONFIG,
 } from "./core/config";
 import { playSound } from "./hooks/sound";
+
+// =========================
+// Helpers
+// =========================
+
+/**
+ * Build a friendly display name from a character id.
+ * "player-1" -> "Player 1", "computer-2" -> "Computer 2".
+ */
+function defaultNameForId(id: string): string {
+  const dashIndex = id.indexOf("-");
+  if (dashIndex === -1) return id;
+  const kind = id.slice(0, dashIndex);
+  const number = id.slice(dashIndex + 1);
+  const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+  return `${label} ${number}`;
+}
 
 // =========================
 // Base Character Class
@@ -17,13 +39,16 @@ export abstract class Character {
   // Damage animation tracking
   private _damageAnimationEndTime: number = 0;
   private static readonly DAMAGE_ANIMATION_MS: number = 250;
-  // Walking animation tracking (true for the duration of a move's transition)
+  // Walking animation tracking (true for the walk window after a move)
   private _walkingEndTime: number = 0;
 
   // Last direction moved, used to orient the character's sprite
   public facing: Direction = Direction.DOWN;
   // Set true when this character has won the round
   public winning: boolean = false;
+  // Display name shown in HUDs / end screen. Defaults to a friendly label
+  // derived from the id (e.g. "Player 1", "Computer 2").
+  public name: string;
 
   constructor(
     public id: string,
@@ -34,18 +59,14 @@ export abstract class Character {
     public gridPosition: GridPosition,
     public lives: number,
     public inventory: number = PLAYER_CONFIG.defaultInventory,
-    public bombRange: number = BOMB_CONFIG.blastRadius
-  ) {}
+    public bombRange: number = BOMB_CONFIG.blastRadius,
+    name?: string
+  ) {
+    this.name = name ?? defaultNameForId(id);
+  }
 
   public move(direction: Direction): void {
-    const movements = {
-      [Direction.UP]: { row: -1, col: 0 },
-      [Direction.DOWN]: { row: 1, col: 0 },
-      [Direction.LEFT]: { row: 0, col: -1 },
-      [Direction.RIGHT]: { row: 0, col: 1 },
-    };
-
-    const movement = movements[direction];
+    const movement = DIRECTION_DELTAS[direction];
 
     // Update grid position
     this.gridPosition.row += movement.row;
@@ -57,7 +78,7 @@ export abstract class Character {
 
     // Track facing and walking animation state
     this.facing = direction;
-    this._walkingEndTime = Date.now() + CHARACTER_CONFIG.moveTransitionMs;
+    this._walkingEndTime = Date.now() + CHARACTER_CONFIG.walkAnimMs;
   }
 
   public isWalking(): boolean {
@@ -100,8 +121,24 @@ export abstract class Character {
     this.bombRange = Math.min(this.bombRange + 1, BOMB_CONFIG.maxBlastRadius);
   }
 
-  public canPlaceBomb(): boolean {
-    return this.inventory > 0;
+  /**
+   * Force time-based visual flags to a snapshot value. Used by guests to
+   * mirror the host's immunity / walking / hurt windows without running
+   * their own timers (which would drift over the network).
+   */
+  public syncTimedFlags(flags: {
+    isImmune: boolean;
+    isWalking: boolean;
+    isHurt: boolean;
+  }): void {
+    const now = Date.now();
+    this._damageCooldownEndTime = flags.isImmune
+      ? now + Character.DAMAGE_COOLDOWN_MS
+      : 0;
+    this._walkingEndTime = flags.isWalking ? now + CHARACTER_CONFIG.walkAnimMs : 0;
+    this._damageAnimationEndTime = flags.isHurt
+      ? now + Character.DAMAGE_ANIMATION_MS
+      : 0;
   }
 }
 
@@ -109,6 +146,9 @@ export abstract class Character {
 // Player Class
 // =========================
 export class Player extends Character {
+  // Identity flag distinguishing human-controlled characters from AI.
+  public readonly isPlayer: boolean = true;
+
   constructor(
     id: string,
     color: string,
@@ -118,7 +158,8 @@ export class Player extends Character {
     gridPosition: GridPosition,
     lives: number,
     inventory?: number,
-    bombRange?: number
+    bombRange?: number,
+    name?: string
   ) {
     super(
       id,
@@ -129,7 +170,8 @@ export class Player extends Character {
       gridPosition,
       lives,
       inventory,
-      bombRange
+      bombRange,
+      name
     );
   }
 }
@@ -141,6 +183,9 @@ export class Player extends Character {
 // live DOM grid/dataset flags — this class only carries identity/stats,
 // same as Player.
 export class Computer extends Character {
+  // Identity flag distinguishing AI-controlled characters from humans.
+  public readonly isComputer: boolean = true;
+
   constructor(
     id: string,
     color: string,
@@ -150,7 +195,8 @@ export class Computer extends Character {
     gridPosition: GridPosition,
     lives: number,
     inventory?: number,
-    bombRange?: number
+    bombRange?: number,
+    name?: string
   ) {
     super(
       id,
@@ -161,7 +207,8 @@ export class Computer extends Character {
       gridPosition,
       lives,
       inventory,
-      bombRange
+      bombRange,
+      name
     );
   }
 }
@@ -186,10 +233,6 @@ class CharacterManager {
     this.characters.set(character.id, character);
   }
 
-  public remove(id: string): boolean {
-    return this.characters.delete(id);
-  }
-
   public get(id: string): Character | undefined {
     return this.characters.get(id);
   }
@@ -210,40 +253,8 @@ class CharacterManager {
     );
   }
 
-  public getAlive(): Character[] {
-    return this.getAll().filter((char) => char.isAlive());
-  }
-
-  public getPosition(id: string): GridPosition | null {
-    return this.characters.get(id)?.gridPosition ?? null;
-  }
-
-  public getLives(id: string): number {
-    return this.characters.get(id)?.lives ?? 0;
-  }
-
-  public isAlive(id: string): boolean {
-    return this.characters.get(id)?.isAlive() ?? false;
-  }
-
   public clear(): void {
     this.characters.clear();
-  }
-
-  public checkCollision(
-    gridPos: GridPosition,
-    excludeId?: string
-  ): Character | null {
-    for (const char of this.characters.values()) {
-      if (excludeId && char.id === excludeId) continue;
-      if (
-        char.gridPosition.row === gridPos.row &&
-        char.gridPosition.col === gridPos.col
-      ) {
-        return char;
-      }
-    }
-    return null;
   }
 }
 
@@ -251,34 +262,3 @@ class CharacterManager {
 // Exported Manager Instance
 // =========================
 export const characterManager = CharacterManager.getInstance();
-
-// =========================
-// Convenience Functions (for backward compatibility)
-// =========================
-export function registerPlayer(character: Character): void {
-  characterManager.register(character);
-}
-
-export function removePlayer(id: string): boolean {
-  return characterManager.remove(id);
-}
-
-export function getPlayer(id: string): Character | undefined {
-  return characterManager.get(id);
-}
-
-export function listPlayers(): ReadonlyArray<Character> {
-  return characterManager.getAll();
-}
-
-export function getPosition(id: string): GridPosition | null {
-  return characterManager.getPosition(id);
-}
-
-export function getLives(id: string): number {
-  return characterManager.getLives(id);
-}
-
-export function isAlive(id: string): boolean {
-  return characterManager.isAlive(id);
-}

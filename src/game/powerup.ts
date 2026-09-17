@@ -1,9 +1,8 @@
-import { getCellAt } from "./grid";
-import { Character } from "./player";
-import { tracker } from "./hooks/tracker";
-import { GridPosition } from "../types/game";
-import { playSound } from "./hooks/sound";
 import { PowerupType } from "./assets/powerups";
+import { getCellAt } from "./grid";
+import { playSound } from "./hooks/sound";
+import { tracker } from "./hooks/tracker";
+import { Character } from "./player";
 
 /**
  * Check if a character is on a cell with a powerup and collect it
@@ -50,21 +49,6 @@ export function checkPowerupPickup(character: Character): void {
 
   // Remove the powerup from the cell
   cell.removeChild(powerupElement);
-}
-
-/**
- * Create a visual effect for powerup collection
- * @param position The grid position where the powerup was collected
- * @param type The type of powerup collected
- */
-export function createPowerupCollectionEffect(
-  position: GridPosition,
-  type: PowerupType
-): void {
-  if (typeof document === "undefined") return;
-
-  // Implementation for visual effects when collecting powerups
-  // This could be expanded with animations, particles, etc.
 }
 
 /**

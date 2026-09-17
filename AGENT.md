@@ -16,6 +16,7 @@ Dependencies must be installed first (`yarn install`) — `node_modules` is giti
 - `yarn build` — production build
 - `yarn start` — run the production build
 - `yarn lint` — run ESLint (`next/core-web-vitals`)
+- `yarn typecheck` — run `tsc --noEmit`
 
 There is **no test framework** configured. There are no unit/integration/e2e tests.
 
@@ -34,21 +35,23 @@ There is **no test framework** configured. There are no unit/integration/e2e tes
 src/
   app/                 Next.js App Router (page, layout, game canvas)
   components/          React UI components
-    screens/           Start, Pause, End screens + HUDs
+    screens/           Start, Lobby, Pause, End screens + HUDs
     AudioController.tsx
   game/                Vanilla TS game engine (no React)
-    core/              Config constants (config.ts); other files are empty stubs
+    core/              Config constants (config.ts)
     assets/            DOM element factories (blocks, character, dynamite, powerups)
-    hooks/             tracker.ts (stats), sound.ts (audio); other files are empty stubs
-    engine.ts          Game loop, input handling, lifecycle, win conditions
-    grid.ts            Grid generation + DOM building + walkability
+    hooks/             tracker.ts (stats), sound.ts (audio)
+    net/               Online multiplayer (roomClient, host, guest)
+    engine.ts          Game loop, per-player input, lifecycle, win conditions, roster
+    grid.ts            Grid generation + DOM building + walkability + cell snapshots
+    input.ts           Shared keyboard key -> direction mapping
     player.ts          Character/Player/Computer classes + CharacterManager singleton
-    ai.ts              AI movement logic
+    ai.ts              AI movement logic (BFS pathfinding, danger avoidance)
     animations.ts      Bomb fuse, explosions, chain reactions, barrel destruction
     powerup.ts         Power-up pickup detection
-    bombs.ts           Unused interface (legacy)
   hooks/               React hooks (useAudio.ts)
-  types/               Shared types (game.ts, assets.d.ts)
+  types/               Shared types (game.ts, multiplayer.ts, assets.d.ts)
+server/                WebSocket relay server (ws-server.js) + smoke test
 public/                Static assets (images, music, soundFX)
 ```
 
@@ -59,13 +62,13 @@ public/                Static assets (images, music, soundFX)
 | `src/game/engine.ts` | Main `requestAnimationFrame` loop, keyboard input, movement, bomb placement, blast-cell damage, win conditions, game lifecycle (`startEngine`/`stopEngine`/`pauseGame`/`resumeGame`) |
 | `src/game/grid.ts` | Generates the grid layout (borders, checkerboard solids, random barrels, corner spawn zones), builds the DOM grid, exposes `isWalkable`/`getCellAt`/`resetGrid`/`updateGridLayout` |
 | `src/game/player.ts` | `Character` base class (lives, damage cooldown, immunity, inventory, bomb range), `Player` and `Computer` subclasses, `CharacterManager` singleton |
-| `src/game/ai.ts` | `updateComputerPlayers` — simple random-movement AI with random bomb placement |
-| `src/game/animations.ts` | `armDynamite` — bomb fuse timer, explosion propagation, barrel destruction, chain reactions, power-up drops |
+| `src/game/ai.ts` | `updateComputerPlayers` — BFS pathfinding AI: chase enemies, clear barrels, grab powerups, flee bomb danger |
+| `src/game/animations.ts` | `armDynamite` — bomb fuse timer (pausable via `pauseBombTimers`/`resumeBombTimers`), explosion propagation, barrel destruction, chain reactions, power-up drops |
 | `src/game/powerup.ts` | `checkPowerupPickup` — detects and applies power-ups when a character steps on them |
 | `src/game/core/config.ts` | All tunable constants: `GAME_CONFIG`, `GRID_PATTERN`, `PLAYER_CONFIG`, `BOMB_CONFIG`, `SCORE_CONFIG`, `POWERUP_CONFIG` |
 | `src/game/hooks/tracker.ts` | `GameTracker` + `PlayerTracker` singletons — stats, scores, kills, time tracking, explosion damage application |
 | `src/game/hooks/sound.ts` | `playSound`/`stopSound` — cached `HTMLAudioElement` playback from `public/soundFX/` |
-| `src/types/game.ts` | Shared types: `Position`, `GridPosition`, `Direction`, `CellType`, `GameState`, `GameMode`, `Player`, `Bomb`, `Explosion`, `GameConfig` |
+| `src/types/game.ts` | Shared types: `Position`, `GridPosition`, `Direction` + `DIRECTION_DELTAS`, `GameState`, `GameMode` |
 | `src/app/page.tsx` | Root page — manages `GameState` (START/PLAYING/PAUSED/GAME_OVER/WIN), wires engine callbacks, renders screens |
 | `src/app/game.tsx` | Mounts the grid DOM into React, runs the character render loop |
 
@@ -84,7 +87,7 @@ The engine exposes callback setters (`setOnPlayerDead`, `setOnTimeOver`, `setOnW
 
 ### Rendering model
 
-The grid is a single `HTMLDivElement` (`id="game-grid"`) built once in `grid.ts` and mounted into React via a ref in `game.tsx`. Characters are re-created and re-appended every animation frame in `renderCharacters()`. Cell walkability is tracked via `dataset.solid`, `dataset.barrel`, `dataset.bomb`, and `dataset.powerup` attributes on each cell.
+The grid is a single `HTMLDivElement` (`id="game-grid"`) built once in `grid.ts` and mounted into React via a ref in `game.tsx`. Characters keep one wrapper element each in `charElements`; `renderCharacters()` only updates position per frame and rebuilds the inner visual when its inputs (state/facing/palette/cell size) change. Cell walkability is tracked via `dataset.solid`, `dataset.barrel`, `dataset.bomb`, and `dataset.powerup` attributes on each cell. Note: characters and blast visuals are also children of `grid` — iterate `cellCache` (not `grid.children`) when reading cell state.
 
 ## Conventions
 
@@ -116,13 +119,67 @@ fix: cap displayed time played to game time limit in end screen stats
 
 ## Known issues / caveats
 
-- **Empty stub files**: `src/game/core/{engine,grid,animations}.ts` and `src/game/hooks/{bombs,players,powerups}.ts` are empty leftovers from a refactor. The real implementations live in `src/game/{engine,grid,animations}.ts` and `src/game/hooks/{tracker,sound}.ts`. Do not add code to the empty stubs without clarifying intent.
-- **`src/game/bombs.ts`** contains an unused `activeBomb` interface (legacy).
-- **AI is minimal**: `src/game/ai.ts` implements random movement + random bombs. The `Computer` class in `player.ts` has more sophisticated methods (`evaluateObjective`, `findSafePath`, `shouldPlaceBomb`) that are **not wired into the active loop**. `tasks.md` describes a planned but unimplemented advanced AI system.
-- **`page.tsx`** has a stray `console.log("gameState", gameState)` on line 93.
+- **`tasks.md` describes a more advanced AI** (state machine: HUNTING/ESCAPING/etc., target priorities, player prediction) than what `ai.ts` implements — the shipped AI is a simpler priority chain (chase → barrel → powerup → roam) with danger-avoidance BFS. Treat `tasks.md` as a design spec, not current behavior.
+
+## Online Multiplayer
+
+A self-hostable online multiplayer mode uses a separate WebSocket relay server.
+
+### Running the relay
+
+```bash
+yarn ws          # runs server/ws-server.js on ws://localhost:3001 (WS_PORT env to override)
+yarn dev         # in another terminal, the Next.js client
+```
+
+For production, set `NEXT_PUBLIC_WS_URL` (e.g. `wss://your-host:3001`) so the
+browser bundle connects to the right server.
+
+### Architecture: host-authoritative, dumb relay
+
+The game engine is DOM-bound and uses `Math.random`/`setTimeout`, so it cannot
+run headless on the server or in lockstep. Instead:
+
+- **Relay server** (`server/ws-server.js`, CommonJS, `ws`): game-agnostic. Manages
+  rooms, 4-letter codes, up to 4 slots, and relays messages between host and
+  guests. Never inspects game payloads.
+- **Host browser** runs the real engine unchanged and streams authoritative
+  state. `src/game/net/host.ts` relays bomb blasts (`setOnBombExplode`) and
+  broadcasts full state snapshots every `NET_CONFIG.snapshotIntervalMs` (50ms)
+  via `getCellSnapshots` + character/tracker stats. Online simulation uses a
+  timer loop instead of only `requestAnimationFrame`, but fully backgrounded
+  browser tabs may still be throttled; server-authoritative simulation would
+  be needed to remove that limitation.
+- **Guests** are thin views. `src/game/net/guest.ts` rebuilds the grid from the
+  host's `start` payload, creates local `Player` instances so `game.tsx`
+  renders unchanged, and applies each snapshot (`applyCellSnapshots` +
+  `syncTimedFlags`). Keyboard input is sent to the host as `InputPayload`.
+- **Engine input** is per-player (`inputByPlayer` map in `engine.ts`): the
+  keyboard writes to the local player's entry; `setRemoteInput` applies guest
+  input. `setRoster` declares which slots are local/remote/computer.
+- Pause is disabled in online games (`pauseGame` no-ops when `hasRemotePlayers`).
+- Late joins are blocked once the host calls `lockRoom`. Host disconnect closes
+  the room and guests get `hostLeft`.
+
+### Key modules
+
+| Module | Responsibility |
+| --- | --- |
+| `server/ws-server.js` | Relay server: rooms, codes, slots, message forwarding |
+| `src/types/multiplayer.ts` | Protocol types (room messages, game payloads, snapshots) |
+| `src/game/net/roomClient.ts` | Singleton WebSocket client wrapper + event setters |
+| `src/game/net/host.ts` | Host: snapshot broadcast, blast relay, guest input routing |
+| `src/game/net/guest.ts` | Guest: grid rebuild, snapshot apply, keyboard→host, sounds |
+| `src/components/screens/lobbyScreen.tsx` | Create/join room UI, roster, host start controls |
+
+### Smoke test
+
+`node server/smoke-test.js` (after starting the relay) verifies the room/relay
+protocol: create, join, bidirectional relay, lock rejects late joins, hostLeft
+on host disconnect.
 
 ## Controls
 
 - Move: `WASD` or Arrow Keys
 - Bomb: `Spacebar`
-- Pause/Resume: `Escape`
+- Pause/Resume: `Escape` (disabled in online games)

@@ -1,14 +1,18 @@
-import { Direction, GridPosition } from "../types/game";
+import {
+  Direction,
+  DIRECTION_DELTAS,
+  GridPosition,
+} from "../types/game";
 import { predictBlastCells } from "./animations";
 import { BOMB_CONFIG } from "./core/config";
 import {
-    getActiveBlastCells,
-    getDangerCells,
-    moveCharacter,
-    placeBomb
+  getActiveBlastCells,
+  getDangerCells,
+  moveCharacter,
+  placeBomb
 } from "./engine";
 import { getCellAt, grid, gridCols, gridRows, isWalkable } from "./grid";
-import { Computer, characterManager } from "./player";
+import { characterManager, Computer } from "./player";
 
 // =========================
 // Tuning
@@ -34,12 +38,6 @@ const ESCAPE_MAX_STEPS = Math.max(
   Math.floor(BOMB_CONFIG.fuseDuration / FLEE_DELAY_RANGE[1])
 );
 
-const DIRECTION_DELTAS: Record<Direction, { row: number; col: number }> = {
-  [Direction.UP]: { row: -1, col: 0 },
-  [Direction.DOWN]: { row: 1, col: 0 },
-  [Direction.LEFT]: { row: 0, col: -1 },
-  [Direction.RIGHT]: { row: 0, col: 1 },
-};
 const ALL_DIRECTIONS = [
   Direction.UP,
   Direction.DOWN,

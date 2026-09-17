@@ -26,6 +26,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
   // Get player type label
   const playerTypeLabel = player.isPlayer ? "Player" : "Computer";
   const playerNumber = player.id.split("-")[1] || "";
+  const displayName = player.name || `${playerTypeLabel} ${playerNumber}`;
 
   // Get player status
   const isAlive = player.isAlive;
@@ -51,7 +52,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
               style={{ backgroundColor: player.color }}
             />
             <span className="font- text-white">
-              {playerTypeLabel} {playerNumber}
+              {displayName}
             </span>
           </div>
           <span className="text-xs text-gray-300">

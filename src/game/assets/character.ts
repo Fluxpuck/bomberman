@@ -23,7 +23,7 @@ function ensureKeyframes(): void {
 
 /**
  * Creates a Bomberman-style character element, scaled from the source 120px
- * design box down to the live cell size. See docs/features/bomber-visual-upgrade.md.
+ * design box down to the live cell size.
  */
 export function createBomberVisual(
   accent: string,

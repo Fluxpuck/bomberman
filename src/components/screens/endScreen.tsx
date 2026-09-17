@@ -1,4 +1,3 @@
-import React from "react";
 import { GAME_CONFIG } from "@/game/core/config";
 import { GameStats, PlayerStats } from "../../game/hooks/tracker";
 import { GameState } from "../../types/game";
@@ -6,6 +5,7 @@ import { GameState } from "../../types/game";
 export interface EndScreenProps {
   gameState: GameState;
   winner?: PlayerStats;
+  players?: PlayerStats[];
   timeLeft?: number;
   gameStats: GameStats;
   onReturnToMenu: () => void;
@@ -15,6 +15,7 @@ export interface EndScreenProps {
 export function EndScreen({
   gameState,
   winner,
+  players,
   timeLeft = 0,
   gameStats,
   onReturnToMenu,
@@ -56,8 +57,7 @@ export function EndScreen({
                   style={{ backgroundColor: winner?.color || "#4A90E2" }}
                 />
                 <span className="text-xl font-semibold text-white">
-                  {winner?.isPlayer ? "Player" : "Computer"}{" "}
-                  {winner?.id && winner?.id.split("-")[1]} Wins!
+                  {winner?.name || `${winner?.isPlayer ? "Player" : "Computer"} ${winner?.id?.split("-")[1] || ""}`} Wins!
                 </span>
               </div>
             </>
@@ -110,7 +110,7 @@ export function EndScreen({
                 className="w-4 h-4 rounded-full"
                 style={{ backgroundColor: winner?.color || "#4A90E2" }}
               />
-              <span>{winner?.isPlayer ? "Player" : "Computer"} Stats</span>
+              <span>{winner?.name || `${winner?.isPlayer ? "Player" : "Computer"} Stats`}</span>
             </h2>
 
             <div className="grid grid-cols-2 gap-y-2 text-sm">

@@ -1,11 +1,40 @@
-import { Direction, GameState, GridPosition, Position } from "../types/game";
+import {
+  Direction,
+  DIRECTION_DELTAS,
+  GameState,
+  GridPosition,
+  Position
+} from "../types/game";
+import { InputPayload, RosterEntry } from "../types/multiplayer";
 import { resetAIState, updateComputerPlayers } from "./ai";
-import { armDynamite, getPendingBombs, predictBlastCells } from "./animations";
-import { CHARACTER_CONFIG, GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./core/config";
-import { grid, gridCols, gridRows, isWalkable } from "./grid";
+import {
+  armDynamite,
+  clearActiveBombTimers,
+  getPendingBombs,
+  pauseBombTimers,
+  predictBlastCells,
+  resumeBombTimers
+} from "./animations";
+import {
+  BOMB_CONFIG,
+  GAME_CONFIG,
+  GRID_PATTERN,
+  NET_CONFIG,
+  PLAYER_CONFIG,
+  PLAYER_PALETTE
+} from "./core/config";
+import {
+  CORNER_ORDER,
+  getCornerSpawn,
+  grid,
+  gridCols,
+  gridRows,
+  isWalkable
+} from "./grid";
 import { playSound } from "./hooks/sound";
 import { tracker } from "./hooks/tracker";
-import { Character, Computer, Player, characterManager } from "./player";
+import { directionByKey, GAME_KEYS } from "./input";
+import { Character, characterManager, Computer, Player } from "./player";
 import { checkPowerupPickup } from "./powerup";
 
 // =========================
@@ -15,6 +44,13 @@ let gameState: GameState = GameState.START;
 let desiredPlayersCount = 1;
 let lastUpdateTime = 0;
 let animationFrameId: number | null = null;
+let simulationIntervalId: number | null = null;
+
+// Roster: which slots are local / remote / computer. Drives player creation
+// and whether pause is allowed (online games can't pause).
+let currentRoster: RosterEntry[] = [];
+let localPlayerId: string | null = null;
+let hasRemotePlayers = false;
 
 // Track active blast cells
 interface BlastCell {
@@ -33,28 +69,48 @@ let onBombExplode: ((cells: GridPosition[], playerId: string) => void) | null =
   null;
 
 // =========================
-// Input State
+// Input State (per-player)
 // =========================
-const keyState: Record<string, boolean> = {};
-const keyProcessed: Record<string, boolean> = {};
-const directionByKey: Record<string, Direction> = {
-  ArrowUp: Direction.UP,
-  w: Direction.UP,
-  W: Direction.UP,
-  ArrowDown: Direction.DOWN,
-  s: Direction.DOWN,
-  S: Direction.DOWN,
-  ArrowLeft: Direction.LEFT,
-  a: Direction.LEFT,
-  A: Direction.LEFT,
-  ArrowRight: Direction.RIGHT,
-  d: Direction.RIGHT,
-  D: Direction.RIGHT,
-};
+// Each human player (local or remote) has its own input entry. The keyboard
+// listener writes to the local player's entry; guests send InputPayload
+// messages that the host applies via setRemoteInput.
+interface PlayerInput {
+  up: boolean;
+  down: boolean;
+  left: boolean;
+  right: boolean;
+  bomb: boolean;
+  bombProcessed: boolean;
+  // Discrete movement actions. One physical key press adds one direction.
+  moveQueue: Direction[];
+}
+const inputByPlayer: Map<string, PlayerInput> = new Map();
+
+function ensureInput(playerId: string): PlayerInput {
+  let entry = inputByPlayer.get(playerId);
+  if (!entry) {
+    entry = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      bomb: false,
+      bombProcessed: false,
+      moveQueue: [],
+    };
+    inputByPlayer.set(playerId, entry);
+  }
+  return entry;
+}
+
+/** Queue one movement action without allowing network bursts to grow forever. */
+export function queuePlayerMove(playerId: string, direction: Direction): void {
+  const input = ensureInput(playerId);
+  if (input.moveQueue.length >= PLAYER_CONFIG.maxQueuedMoves) return;
+  input.moveQueue.push(direction);
+}
 
 const lastBombTimeByPlayer: Record<string, number> = {};
-const BOMB_COOLDOWN_MS = 350;
-let lastPlayerMoveAt = 0;
 
 // =========================
 // Helper Functions
@@ -78,64 +134,12 @@ function isInsideGrid(row: number, col: number): boolean {
 }
 
 /**
- * Find a safe spawn position in a corner
- */
-function getCornerSpawn(corner: "tl" | "tr" | "bl" | "br"): GridPosition {
-  const positions: Record<string, GridPosition> = {
-    tl: { row: 1, col: 1 },
-    tr: { row: 1, col: gridCols - 2 },
-    bl: { row: gridRows - 2, col: 1 },
-    br: { row: gridRows - 2, col: gridCols - 2 },
-  };
-
-  const basePos = positions[corner];
-
-  // Check if the position is walkable, if not find a nearby position
-  if (isWalkable(basePos.row, basePos.col)) {
-    return basePos;
-  }
-
-  // Try adjacent cells in a spiral pattern
-  const directions = [
-    [0, 1],
-    [1, 0],
-    [0, -1],
-    [-1, 0], // Right, Down, Left, Up
-    [1, 1],
-    [1, -1],
-    [-1, -1],
-    [-1, 1], // Diagonals
-  ];
-
-  for (let radius = 1; radius <= 3; radius++) {
-    for (const [dr, dc] of directions) {
-      const row = basePos.row + dr * radius;
-      const col = basePos.col + dc * radius;
-
-      if (isInsideGrid(row, col) && isWalkable(row, col)) {
-        return { row, col };
-      }
-    }
-  }
-
-  // Fallback to the base position even if not walkable
-  return basePos;
-}
-
-/**
  * Check if a player can move in a direction
  */
 export function canMove(character: Character, direction: Direction): boolean {
   const { row, col } = character.gridPosition;
 
-  const movements = {
-    [Direction.UP]: { row: -1, col: 0 },
-    [Direction.DOWN]: { row: 1, col: 0 },
-    [Direction.LEFT]: { row: 0, col: -1 },
-    [Direction.RIGHT]: { row: 0, col: 1 },
-  };
-
-  const movement = movements[direction];
+  const movement = DIRECTION_DELTAS[direction];
   const targetRow = row + movement.row;
   const targetCol = col + movement.col;
 
@@ -193,7 +197,7 @@ export function placeBomb(character: Character): boolean {
   const lastTime = lastBombTimeByPlayer[character.id] || 0;
 
   // Check if enough time has passed since this player's last bomb placement
-  if (now - lastTime < BOMB_COOLDOWN_MS) {
+  if (now - lastTime < BOMB_CONFIG.cooldownMs) {
     return false;
   }
 
@@ -222,7 +226,11 @@ export function placeBomb(character: Character): boolean {
   armDynamite(grid, bombPosition, {
     bombRange: playerTracker.bombRange,
     ownerId: character.id,
-    onDetonate: (cells, duration) => {
+    onDetonate: (cells, duration, ownerId) => {
+      // For chain reactions the detonating bomb's owner differs from the
+      // character whose placeBomb created this callback.
+      const blastOwnerId = ownerId ?? character.id;
+
       // Add cells to active blast cells list before checking damage so the
       // detonation and movement paths use the same hit rules.
       const blastEndTime = Date.now() + duration;
@@ -230,7 +238,7 @@ export function placeBomb(character: Character): boolean {
         activeBlastCells.push({
           position: { row: cell.row, col: cell.col },
           endTime: blastEndTime,
-          ownerId: character.id,
+          ownerId: blastOwnerId,
           hitCharacterIds: new Set<string>(),
         });
       });
@@ -242,7 +250,7 @@ export function placeBomb(character: Character): boolean {
 
       // Trigger bomb explode callback
       if (onBombExplode) {
-        onBombExplode(cells, character.id);
+        onBombExplode(cells, blastOwnerId);
       }
 
       // Check win conditions
@@ -264,88 +272,105 @@ export function placeBomb(character: Character): boolean {
 // =========================
 
 /**
- * Handle keyboard input for player movement
+ * Apply one human player's input entry. Movement is discrete: each physical
+ * key press contributes one queued move, with no 300ms held-key gate. One
+ * queued action is consumed per simulation tick for every player equally.
  */
-function handlePlayerInput() {
-  const humanPlayers = characterManager.getPlayers();
-  if (humanPlayers.length === 0) return;
-
-  // Get the first human player
-  const player = humanPlayers[0];
+function applyPlayerInput(player: Player) {
   if (!player.isAlive()) return;
 
-  // Move one cell per repeat interval while a direction key is held.
-  const moveKeys = [
-    { keys: ["ArrowUp", "w", "W"], direction: Direction.UP },
-    { keys: ["ArrowDown", "s", "S"], direction: Direction.DOWN },
-    { keys: ["ArrowLeft", "a", "A"], direction: Direction.LEFT },
-    { keys: ["ArrowRight", "d", "D"], direction: Direction.RIGHT },
-  ];
-  const now = Date.now();
-  const canRepeatMove =
-    now - lastPlayerMoveAt >= CHARACTER_CONFIG.moveTransitionMs;
-
-  if (canRepeatMove) {
-    for (const { keys, direction } of moveKeys) {
-      const isKeyPressed = keys.some((key) => keyState[key]);
-      if (!isKeyPressed) continue;
-
-      moveCharacter(player, direction);
-      lastPlayerMoveAt = now;
-      break;
-    }
+  const input = ensureInput(player.id);
+  const direction = input.moveQueue.shift();
+  if (direction !== undefined) {
+    moveCharacter(player, direction);
   }
 
-  // Handle bomb placement - also on initial press only
-  if (keyState[" "] && !keyProcessed[" "]) {
+  // Bomb placement remains edge-triggered, so the heartbeat cannot place
+  // repeated bombs while Space is held.
+  if (input.bomb && !input.bombProcessed) {
     placeBomb(player);
-    keyProcessed[" "] = true;
-  } else if (!keyState[" "]) {
-    keyProcessed[" "] = false;
+    input.bombProcessed = true;
+  } else if (!input.bomb) {
+    input.bombProcessed = false;
   }
 }
 
 /**
- * Set up keyboard event listeners
+ * Handle input for all human players (local + remote). Bots are driven by
+ * updateComputerPlayers separately.
+ */
+function handlePlayerInput() {
+  const humanPlayers = characterManager.getPlayers();
+  for (const player of humanPlayers) {
+    applyPlayerInput(player);
+  }
+}
+
+/**
+ * Apply a remote player's input state. Called by the host net layer when a
+ * guest sends an InputPayload message.
+ */
+export function setRemoteInput(playerId: string, payload: InputPayload) {
+  const input = ensureInput(playerId);
+  input.up = payload.up;
+  input.down = payload.down;
+  input.left = payload.left;
+  input.right = payload.right;
+  input.bomb = payload.bomb;
+
+  // `move` exists only on discrete key-press messages. Heartbeat messages
+  // omit it, so held keys never create accidental movement repeats.
+  if (payload.move !== undefined) {
+    queuePlayerMove(playerId, payload.move);
+  }
+}
+
+/**
+ * Set up keyboard event listeners for the local player.
  */
 function setupInputListeners() {
   if (typeof window === "undefined") return;
+  if (!localPlayerId) return;
+
+  const playerId = localPlayerId;
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // Prevent default behavior for arrow keys and space to avoid page scrolling
-    if (
-      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)
-    ) {
+    if (GAME_KEYS.includes(e.key)) {
       e.preventDefault();
     }
 
-    // Handle Escape key for pausing
-    if (e.key === "Escape") {
-      // Toggle between paused and playing states
-      if (gameState === GameState.PLAYING) {
-        pauseGame();
-      } else if (gameState === GameState.PAUSED) {
-        resumeGame();
-      }
-      return; // Don't track Escape in keyState
-    }
+    // Escape is handled by the page layer, which owns the React game state.
 
+    const input = ensureInput(playerId);
     const direction = directionByKey[e.key];
-    if (!e.repeat && direction !== undefined && gameState === GameState.PLAYING) {
-      const player = characterManager.getPlayers()[0];
-      if (player?.isAlive()) {
-        moveCharacter(player, direction);
-        lastPlayerMoveAt = Date.now();
+    if (direction !== undefined) {
+      if (direction === Direction.UP) input.up = true;
+      else if (direction === Direction.DOWN) input.down = true;
+      else if (direction === Direction.LEFT) input.left = true;
+      else if (direction === Direction.RIGHT) input.right = true;
+
+      // Ignore browser key-repeat. One physical key press = one move.
+      if (!e.repeat && gameState === GameState.PLAYING) {
+        queuePlayerMove(playerId, direction);
       }
     }
-
-    keyState[e.key] = true;
+    if (e.key === " ") {
+      input.bomb = true;
+    }
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
-    if (e.key !== "Escape") {
-      // Don't track Escape in keyState
-      keyState[e.key] = false;
+    const input = ensureInput(playerId);
+    const direction = directionByKey[e.key];
+    if (direction !== undefined) {
+      if (direction === Direction.UP) input.up = false;
+      else if (direction === Direction.DOWN) input.down = false;
+      else if (direction === Direction.LEFT) input.left = false;
+      else if (direction === Direction.RIGHT) input.right = false;
+    }
+    if (e.key === " ") {
+      input.bomb = false;
     }
   };
 
@@ -482,12 +507,10 @@ function cleanupBlastCells(): void {
  * Main game update function
  */
 function update() {
-  // Don't update if not in playing state
+  // Don't update if not in playing state. No rescheduling while paused:
+  // resumeGame restarts the loop, and a paused frame that kept rescheduling
+  // would leave a second loop running after resume.
   if (gameState !== GameState.PLAYING) {
-    // If we're paused, just request the next frame but don't update game state
-    if (gameState === GameState.PAUSED) {
-      animationFrameId = requestAnimationFrame(update);
-    }
     return;
   }
 
@@ -512,8 +535,12 @@ function update() {
     }
   }
 
-  // Request next frame
-  animationFrameId = requestAnimationFrame(update);
+  // Online hosts use a timer-driven simulation loop. Local games retain the
+  // animation-frame loop; unlike requestAnimationFrame, a timer can continue
+  // making progress when host tab is backgrounded (subject to browser limits).
+  if (simulationIntervalId === null) {
+    animationFrameId = requestAnimationFrame(update);
+  }
 }
 
 // =========================
@@ -527,6 +554,16 @@ function checkWinConditions() {
   const alivePlayers = characterManager
     .getAll()
     .filter((char) => char.isAlive());
+
+  // In online multiplayer, end the game when no human players are alive.
+  // Bots don't count — the round is over once all real players are dead.
+  if (hasRemotePlayers) {
+    const aliveHumans = alivePlayers.filter((char) => char instanceof Player);
+    if (aliveHumans.length === 0) {
+      handlePlayerDeath();
+      return;
+    }
+  }
 
   // In multiplayer, last player standing wins
   if (desiredPlayersCount > 1 && alivePlayers.length === 1) {
@@ -603,8 +640,16 @@ export function startEngine() {
   // Set up input handlers
   const removeListeners = setupInputListeners();
 
-  // Start game loop
-  animationFrameId = requestAnimationFrame(update);
+  // Start game loop. Online hosts use a timer instead of rAF because browser
+  // throttling can pause rAF when host switches to another tab/window.
+  if (hasRemotePlayers) {
+    simulationIntervalId = window.setInterval(
+      update,
+      NET_CONFIG.simulationIntervalMs
+    );
+  } else {
+    animationFrameId = requestAnimationFrame(update);
+  }
 
   return () => {
     if (removeListeners) removeListeners();
@@ -613,10 +658,12 @@ export function startEngine() {
 }
 
 /**
- * Pause the game engine
+ * Pause the game engine. Disabled in online games (host + guests can't
+ * pause a shared game).
  */
 export function pauseGame() {
   if (gameState !== GameState.PLAYING) return;
+  if (hasRemotePlayers) return;
 
   // Stop game loop
   if (animationFrameId !== null) {
@@ -626,6 +673,9 @@ export function pauseGame() {
 
   // Pause tracking game time
   tracker.pauseGame();
+
+  // Freeze bomb fuses so nothing explodes while paused
+  pauseBombTimers();
 
   // Set game state to paused
   gameState = GameState.PAUSED;
@@ -639,6 +689,9 @@ export function resumeGame() {
 
   // Resume tracking game time
   tracker.resumeGame();
+
+  // Re-arm bomb fuses with their remaining fuse time
+  resumeBombTimers();
 
   // Reset last update time
   lastUpdateTime = Date.now();
@@ -659,15 +712,27 @@ export function stopEngine() {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = null;
   }
+  if (simulationIntervalId !== null) {
+    window.clearInterval(simulationIntervalId);
+    simulationIntervalId = null;
+  }
 
   // Stop tracking game time
   tracker.stopGame();
 
-  // Reset key states
-  Object.keys(keyState).forEach((key) => {
-    keyState[key] = false;
-    keyProcessed[key] = false; // Also reset processed state
-  });
+  // Cancel ticking bombs so stale fuses can't detonate into the next game
+  clearActiveBombTimers();
+
+  // Clear all active blast cells
+  activeBlastCells.length = 0;
+
+  // Reset per-player input state
+  inputByPlayer.clear();
+
+  // Clear per-player bomb placement cooldowns
+  for (const key of Object.keys(lastBombTimeByPlayer)) {
+    delete lastBombTimeByPlayer[key];
+  }
 
   gameState = GameState.START;
 }
@@ -686,10 +751,7 @@ export function resetEngine() {
   tracker.reset();
 
   // Reset input state
-  Object.keys(keyState).forEach((key) => {
-    keyState[key] = false;
-    keyProcessed[key] = false;
-  });
+  inputByPlayer.clear();
 
   // Reset AI state
   resetAIState();
@@ -702,10 +764,54 @@ export function resetEngine() {
 }
 
 /**
- * Set the desired number of players
+ * Set the desired number of players (solo/local modes). Builds a default
+ * roster: one local human + the rest as computers.
  */
 export function setDesiredPlayersCount(count: number) {
   desiredPlayersCount = Math.max(1, Math.min(4, count));
+
+  // Build the default roster for local play.
+  currentRoster = [];
+  currentRoster.push({
+    id: "player-1",
+    name: "Player 1",
+    control: "local",
+    slot: 0,
+  });
+  for (let i = 1; i < desiredPlayersCount; i++) {
+    currentRoster.push({
+      id: `computer-${i}`,
+      name: `Computer ${i}`,
+      control: "computer",
+      slot: i,
+    });
+  }
+  localPlayerId = "player-1";
+  hasRemotePlayers = false;
+}
+
+/**
+ * Set an explicit roster (online host). Each entry declares whether the
+ * slot is controlled locally, by a remote guest, or by a computer bot.
+ */
+export function setRoster(roster: RosterEntry[]) {
+  currentRoster = roster;
+  desiredPlayersCount = roster.length;
+  localPlayerId = roster.find((e) => e.control === "local")?.id ?? null;
+  hasRemotePlayers = roster.some((e) => e.control === "remote");
+}
+
+/**
+ * Eliminate a player mid-game (e.g. a guest disconnected). Sets their lives
+ * to zero and re-checks win conditions.
+ */
+export function eliminatePlayer(playerId: string) {
+  const character = characterManager.get(playerId);
+  if (!character) return;
+  if (!character.isAlive()) return;
+
+  character.lives = 0;
+  checkWinConditions();
 }
 
 /**
@@ -739,71 +845,59 @@ export function setOnBombExplode(
 }
 
 /**
- * Initialize players for the game
+ * Initialize players for the game from the current roster. Each roster entry
+ * becomes a Character at its corner slot (tl, tr, bl, br) with the palette
+ * color for that slot. Local + remote entries become Player instances;
+ * computer entries become Computer instances (driven by the AI loop).
  */
 export function initializePlayers() {
   // Clear existing characters
   characterManager.clear();
 
-  // Create human player at top-left corner
-  const playerSpawn = getCornerSpawn("tl");
-  const player = new Player(
-    "player-1",
-    "#4aa3ff", // Azure
-    "#12457f",
-    "#cfe8ff",
-    gridToPixel(playerSpawn),
-    playerSpawn,
-    PLAYER_CONFIG.defaultLives
-  );
-  characterManager.register(player);
-  tracker.registerPlayer(player);
+  currentRoster.forEach((entry, index) => {
+    const spawn = getCornerSpawn(CORNER_ORDER[index] ?? "tl");
+    const palette = PLAYER_PALETTE[index] ?? PLAYER_PALETTE[0];
+    const pixelPos = gridToPixel(spawn);
 
-  // Create computer players based on desired count
-  if (desiredPlayersCount >= 2) {
-    const computerSpawn = getCornerSpawn("tr");
-    const computer1 = new Computer(
-      "computer-1",
-      "#ff5f5f", // Ember
-      "#a62a2a",
-      "#ffd3cf",
-      gridToPixel(computerSpawn),
-      computerSpawn,
-      PLAYER_CONFIG.defaultLives
-    );
-    characterManager.register(computer1);
-    tracker.registerPlayer(computer1);
-  }
+    if (entry.control === "computer") {
+      const computer = new Computer(
+        entry.id,
+        palette.accent,
+        palette.dark,
+        palette.light,
+        pixelPos,
+        spawn,
+        PLAYER_CONFIG.defaultLives,
+        undefined,
+        undefined,
+        entry.name
+      );
+      characterManager.register(computer);
+      tracker.registerPlayer(computer);
+    } else {
+      // local + remote are both Player instances; remote input arrives via
+      // setRemoteInput instead of the keyboard listener.
+      const player = new Player(
+        entry.id,
+        palette.accent,
+        palette.dark,
+        palette.light,
+        pixelPos,
+        spawn,
+        PLAYER_CONFIG.defaultLives,
+        undefined,
+        undefined,
+        entry.name
+      );
+      characterManager.register(player);
+      tracker.registerPlayer(player);
+    }
 
-  if (desiredPlayersCount >= 3) {
-    const computerSpawn = getCornerSpawn("bl");
-    const computer2 = new Computer(
-      "computer-2",
-      "#f5a623", // Amber
-      "#a96a06",
-      "#ffe6b8",
-      gridToPixel(computerSpawn),
-      computerSpawn,
-      PLAYER_CONFIG.defaultLives
-    );
-    characterManager.register(computer2);
-    tracker.registerPlayer(computer2);
-  }
-
-  if (desiredPlayersCount >= 4) {
-    const computerSpawn = getCornerSpawn("br");
-    const computer3 = new Computer(
-      "computer-3",
-      "#b45ddb", // Violet
-      "#6f2f96",
-      "#ecd4ff",
-      gridToPixel(computerSpawn),
-      computerSpawn,
-      PLAYER_CONFIG.defaultLives
-    );
-    characterManager.register(computer3);
-    tracker.registerPlayer(computer3);
-  }
+    // Ensure an input entry exists for human players.
+    if (entry.control !== "computer") {
+      ensureInput(entry.id);
+    }
+  });
 }
 
 // =========================
@@ -823,3 +917,5 @@ export function getGameState(): GameState {
 export function getDesiredPlayersCount(): number {
   return desiredPlayersCount;
 }
+
+
