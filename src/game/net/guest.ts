@@ -1,4 +1,9 @@
-import { Direction, GridPosition, Position } from "../../types/game";
+import {
+  Direction,
+  DIRECTION_DELTAS,
+  GridPosition,
+  Position,
+} from "../../types/game";
 import {
   BlastPayload,
   GameOverPayload,
@@ -20,6 +25,7 @@ import {
   getCellAt,
   getCornerSpawn,
   grid,
+  isWalkable,
   resetGrid
 } from "../grid";
 import { playSound } from "../hooks/sound";
@@ -38,6 +44,8 @@ import { roomClient } from "./roomClient";
 
 let active = false;
 let myPlayerId: string | null = null;
+let nextInputSequence = 0;
+let pendingMoves: Array<{ sequence: number; direction: Direction }> = [];
 let latestStats: PlayerStats[] = [];
 let latestTimeElapsedMs = 0;
 let latestGameOver: GameOverPayload | null = null;
@@ -72,6 +80,8 @@ export function startGuestView(payload: StartPayload) {
   previousLives.clear();
   previousBombByIndex.clear();
   previousPowerupByIndex.clear();
+  nextInputSequence = 0;
+  pendingMoves = [];
 
   // Rebuild the grid to mirror the host's layout exactly.
   resetGrid(payload.cellTypes);
@@ -112,6 +122,19 @@ export function startGuestView(payload: StartPayload) {
   removeKeyboardListener = setupKeyboardInput();
 }
 
+function predictMove(direction: Direction): void {
+  if (!myPlayerId) return;
+  const player = characterManager.get(myPlayerId);
+  if (!player || !player.isAlive()) return;
+
+  const delta = DIRECTION_DELTAS[direction];
+  const targetRow = player.gridPosition.row + delta.row;
+  const targetCol = player.gridPosition.col + delta.col;
+  if (!isWalkable(targetRow, targetCol)) return;
+
+  player.move(direction);
+}
+
 /**
  * Apply a full state snapshot from the host: update character positions,
  * lives, and visual flags; sync the grid cells; play diff-based sounds.
@@ -148,6 +171,16 @@ export function applySnapshot(payload: SnapshotPayload) {
       isWalking: snap.isWalking,
       isHurt: snap.isHurt,
     });
+
+    if (snap.id === myPlayerId) {
+      const acknowledgedSequence = snap.lastProcessedInputSequence ?? 0;
+      pendingMoves = pendingMoves.filter(
+        (move) => move.sequence > acknowledgedSequence
+      );
+      for (const move of pendingMoves) {
+        predictMove(move.direction);
+      }
+    }
   }
 
   // --- Cells: bombs, powerups, destroyed barrels ---
@@ -225,6 +258,11 @@ export function handleHostPayload(payload: GamePayload) {
     case "gameOver":
       applyGameOver(payload);
       break;
+    case "latencyPing":
+      if (payload.slot === roomClient.getSlot()) {
+        roomClient.sendToHost({ t: "latencyPong", id: payload.id });
+      }
+      break;
     case "start":
       // The guest receives start before snapshots; startGuestView is called
       // by the page layer which owns the roster, so this is a no-op here.
@@ -249,8 +287,10 @@ function setupKeyboardInput(): () => void {
   };
 
   const send = (move?: Direction) => {
+    const sequence = ++nextInputSequence;
     roomClient.sendToHost({
       t: "input",
+      sequence,
       up: input.up,
       down: input.down,
       left: input.left,
@@ -273,8 +313,12 @@ function setupKeyboardInput(): () => void {
 
       // Browser key-repeat must not create movement faster than physical
       // key presses. Each non-repeat keydown sends one discrete move.
-      if (!e.repeat) send(direction);
-      else send();
+      if (!e.repeat) {
+        const sequence = nextInputSequence + 1;
+        pendingMoves.push({ sequence, direction });
+        predictMove(direction);
+        send(direction);
+      } else send();
     }
     if (e.key === " ") {
       input.bomb = true;
@@ -343,6 +387,8 @@ export function stopGuestView() {
     removeKeyboardListener = null;
   }
   myPlayerId = null;
+  nextInputSequence = 0;
+  pendingMoves = [];
   latestStats = [];
   latestTimeElapsedMs = 0;
   latestGameOver = null;

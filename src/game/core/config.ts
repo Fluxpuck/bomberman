@@ -41,6 +41,8 @@ export const NET_CONFIG = {
   // Repeat guest input while keys are held. This recovers from missed
   // keyup/keydown events and keeps input state fresh across the socket.
   inputIntervalMs: 50,
+  // How often the host measures guest round-trip latency.
+  latencyPingIntervalMs: 1000,
   // Online host simulation cadence. setInterval is less aggressively paused
   // than requestAnimationFrame when a host window is backgrounded.
   simulationIntervalMs: 16,

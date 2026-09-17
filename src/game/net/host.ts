@@ -22,7 +22,11 @@ import { roomClient } from "./roomClient";
 // guests. Guests send input back; the host applies it via setRemoteInput.
 
 let snapshotIntervalId: number | null = null;
+let latencyIntervalId: number | null = null;
 let blastRelayActive = false;
+let latencyPingId = 0;
+const pendingLatencyPings = new Map<number, { id: number; sentAt: number }>();
+const lastProcessedInputSequence = new Map<string, number>();
 
 /** Map a roster slot number to the character id used by the engine. */
 export function slotToPlayerId(slot: number, roster: RosterEntry[]): string | null {
@@ -70,6 +74,7 @@ function buildCharacterSnapshots(): CharacterSnapshot[] {
     isImmune: char.isImmune(),
     isWalking: char.isWalking(),
     isHurt: char.isShowingDamageAnimation(),
+    lastProcessedInputSequence: lastProcessedInputSequence.get(char.id) ?? 0,
   }));
 }
 
@@ -107,11 +112,28 @@ export function startHosting(roster: RosterEntry[]) {
     roomClient.sendToGuests(blast);
   });
 
+  lastProcessedInputSequence.clear();
+  pendingLatencyPings.clear();
+
   // Broadcast full state snapshots at a fixed interval.
   snapshotIntervalId = window.setInterval(
     () => broadcastSnapshot(),
     NET_CONFIG.snapshotIntervalMs
   );
+
+  latencyIntervalId = window.setInterval(() => {
+    const now = Date.now();
+    for (const entry of roster) {
+      if (entry.control !== "remote") continue;
+      const id = ++latencyPingId;
+      pendingLatencyPings.set(entry.slot, { id, sentAt: now });
+      roomClient.sendToGuests({
+        t: "latencyPing",
+        id,
+        slot: entry.slot,
+      });
+    }
+  }, NET_CONFIG.latencyPingIntervalMs);
 }
 
 /**
@@ -150,9 +172,21 @@ export function sendGameOver(state: GameState, winnerId?: string) {
  * expected from guests; they are routed to the engine via setRemoteInput.
  */
 export function handleGuestPayload(fromSlot: number, payload: GamePayload, roster: RosterEntry[]) {
+  if (payload.t === "latencyPong") {
+    const pending = pendingLatencyPings.get(fromSlot);
+    if (!pending || pending.id !== payload.id) return;
+
+    pendingLatencyPings.delete(fromSlot);
+    const playerId = slotToPlayerId(fromSlot, roster);
+    const player = playerId ? characterManager.get(playerId) : undefined;
+    if (player) player.latencyMs = Date.now() - pending.sentAt;
+    return;
+  }
+
   if (payload.t !== "input") return;
   const playerId = slotToPlayerId(fromSlot, roster);
   if (!playerId) return;
+  lastProcessedInputSequence.set(playerId, payload.sequence);
   setRemoteInput(playerId, payload);
 }
 
@@ -164,6 +198,12 @@ export function stopHosting() {
     clearInterval(snapshotIntervalId);
     snapshotIntervalId = null;
   }
+  if (latencyIntervalId !== null) {
+    clearInterval(latencyIntervalId);
+    latencyIntervalId = null;
+  }
+  pendingLatencyPings.clear();
+  lastProcessedInputSequence.clear();
   blastRelayActive = false;
   setOnBombExplode(null);
 }

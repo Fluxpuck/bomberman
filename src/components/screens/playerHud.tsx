@@ -54,6 +54,11 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
             <span className="font- text-white">
               {displayName}
             </span>
+            {player.latencyMs !== null && (
+              <span className="text-[10px] text-gray-400">
+                {player.latencyMs} ms
+              </span>
+            )}
           </div>
           <span className="text-xs text-gray-300">
             Score: <span className="font-extrabold">{player.score}</span>

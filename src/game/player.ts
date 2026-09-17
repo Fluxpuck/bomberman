@@ -49,6 +49,8 @@ export abstract class Character {
   // Display name shown in HUDs / end screen. Defaults to a friendly label
   // derived from the id (e.g. "Player 1", "Computer 2").
   public name: string;
+  // Host-measured round-trip latency for online players; null offline.
+  public latencyMs: number | null = null;
 
   constructor(
     public id: string,

@@ -894,6 +894,7 @@ export function initializePlayers() {
       );
       characterManager.register(computer);
       tracker.registerPlayer(computer);
+      computer.latencyMs = null;
     } else {
       // local + remote are both Player instances; remote input arrives via
       // setRemoteInput instead of the keyboard listener.
@@ -911,6 +912,7 @@ export function initializePlayers() {
       );
       characterManager.register(player);
       tracker.registerPlayer(player);
+      player.latencyMs = entry.control === "local" ? 0 : null;
     }
 
     // Ensure an input entry exists for human players.

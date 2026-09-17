@@ -21,6 +21,7 @@ export interface PlayerStats {
   isAlive: boolean;
   isPlayer: boolean;
   color: string;
+  latencyMs: number | null;
 }
 
 // =========================
@@ -181,6 +182,7 @@ class PlayerTracker {
       isAlive: this.isAlive,
       isPlayer: this.isPlayer,
       color: this.color,
+      latencyMs: this._character.latencyMs,
     };
   }
 }
