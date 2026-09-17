@@ -59,7 +59,7 @@ would remove this browser limitation. Pause is disabled in online games.
 
 ## Built With
 
-- Next.js 14+
+- Next.js 16+ with Turbopack
 - TypeScript
 - Tailwind CSS
 

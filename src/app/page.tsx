@@ -92,6 +92,7 @@ export default function Home() {
         startGuestView(payload);
         setGameState(GameState.PLAYING);
       } else if (payload.t === "gameOver") {
+        handleHostPayload(payload);
         setGameState(payload.state === "WIN" ? GameState.WIN : GameState.GAME_OVER);
       } else {
         handleHostPayload(payload);
@@ -211,10 +212,11 @@ export default function Home() {
     // Host or solo/local: initialize players, start the engine, wire callbacks.
     initializePlayers();
 
-    setOnPlayerDead(() => {
+    setOnPlayerDead((winnerId) => {
+      setWinner(winnerId ? tracker.getPlayer(winnerId)?.getStats() : undefined);
       setGameState(GameState.GAME_OVER);
       if (gameMode === "online") {
-        sendGameOver(getGameState());
+        sendGameOver(getGameState(), winnerId);
       }
     });
 
@@ -230,7 +232,7 @@ export default function Home() {
       setWinner(winnerStats);
       setGameState(GameState.WIN);
       if (gameMode === "online") {
-        sendGameOver(getGameState());
+        sendGameOver(getGameState(), winnerId);
       }
     });
 
@@ -263,6 +265,7 @@ export default function Home() {
     setGameMode(mode);
     setGameState(GameState.PLAYING);
     setTimeElapsedMs(0);
+    setWinner(undefined);
     resetGrid();
     tracker.reset();
     tracker.startGame();

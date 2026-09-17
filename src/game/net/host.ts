@@ -128,17 +128,17 @@ export function sendStart(roster: RosterEntry[]) {
 }
 
 /**
- * Send the game-over payload so guests can show the end screen.
+ * Send the game-over payload so guests can show the end screen, including
+ * the winner's stats when the game produced one.
  */
-export function sendGameOver(state: GameState) {
-  const isWin = state === GameState.WIN;
-  const alive = characterManager.getAll().filter((c) => c.isAlive());
-  const winnerId = isWin ? alive[0]?.id : undefined;
-  const winnerStats = winnerId ? tracker.getPlayer(winnerId)?.getStats() : undefined;
+export function sendGameOver(state: GameState, winnerId?: string) {
+  const winnerStats = winnerId
+    ? tracker.getPlayer(winnerId)?.getStats()
+    : undefined;
 
   const payload: GameOverPayload = {
     t: "gameOver",
-    state: isWin ? "WIN" : "GAME_OVER",
+    state: state === GameState.WIN ? "WIN" : "GAME_OVER",
     winner: winnerStats,
     gameStats: tracker.getGameStats(),
   };

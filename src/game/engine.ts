@@ -45,6 +45,7 @@ let desiredPlayersCount = 1;
 let lastUpdateTime = 0;
 let animationFrameId: number | null = null;
 let simulationIntervalId: number | null = null;
+let inputListenersCleanup: (() => void) | null = null;
 
 // Roster: which slots are local / remote / computer. Drives player creation
 // and whether pause is allowed (online games can't pause).
@@ -62,7 +63,7 @@ interface BlastCell {
 const activeBlastCells: BlastCell[] = [];
 
 // Game event callbacks
-let onPlayerDead: (() => void) | null = null;
+let onPlayerDead: ((winnerId?: string) => void) | null = null;
 let onTimeOver: (() => void) | null = null;
 let onWin: ((winnerId: string) => void) | null = null;
 let onBombExplode: ((cells: GridPosition[], playerId: string) => void) | null =
@@ -589,8 +590,16 @@ function handlePlayerDeath() {
   if (gameState !== GameState.PLAYING) return;
 
   gameState = GameState.GAME_OVER;
+
+  // A lone survivor still counts as the winner when the game ends through
+  // the death path (e.g. online: all humans dead but one bot remains).
+  const alivePlayers = characterManager
+    .getAll()
+    .filter((char) => char.isAlive());
+  const winnerId = alivePlayers.length === 1 ? alivePlayers[0].id : undefined;
+
   if (onPlayerDead) {
-    onPlayerDead();
+    onPlayerDead(winnerId);
   }
 }
 
@@ -637,8 +646,13 @@ export function startEngine() {
   // Start tracking game time
   tracker.startGame();
 
-  // Set up input handlers
-  const removeListeners = setupInputListeners();
+  // Set up input handlers. Clean up a stale listener first so restarting a
+  // round cannot make one physical key press queue multiple moves.
+  if (inputListenersCleanup) {
+    inputListenersCleanup();
+    inputListenersCleanup = null;
+  }
+  inputListenersCleanup = setupInputListeners() ?? null;
 
   // Start game loop. Online hosts use a timer instead of rAF because browser
   // throttling can pause rAF when host switches to another tab/window.
@@ -652,7 +666,6 @@ export function startEngine() {
   }
 
   return () => {
-    if (removeListeners) removeListeners();
     stopEngine();
   };
 }
@@ -725,6 +738,12 @@ export function stopEngine() {
 
   // Clear all active blast cells
   activeBlastCells.length = 0;
+
+  // Remove keyboard listeners so restarting a round cannot duplicate input.
+  if (inputListenersCleanup) {
+    inputListenersCleanup();
+    inputListenersCleanup = null;
+  }
 
   // Reset per-player input state
   inputByPlayer.clear();
@@ -815,9 +834,10 @@ export function eliminatePlayer(playerId: string) {
 }
 
 /**
- * Set callback for player death
+ * Set callback for player death. Receives the winner's id when a single
+ * survivor remains, or undefined when nobody won.
  */
-export function setOnPlayerDead(callback: (() => void) | null) {
+export function setOnPlayerDead(callback: ((winnerId?: string) => void) | null) {
   onPlayerDead = callback;
 }
 

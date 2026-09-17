@@ -46,21 +46,21 @@ export function EndScreen({
           {isGameOver && (
             <h1 className="text-3xl font-bold text-red-500 mb-2">Game Over</h1>
           )}
-          {isWin && winner && (
-            <>
-              <h1 className="text-3xl font-bold text-green-500 mb-2">
-                Victory!
-              </h1>
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <div
-                  className="w-6 h-6 rounded-full"
-                  style={{ backgroundColor: winner?.color || "#4A90E2" }}
-                />
-                <span className="text-xl font-semibold text-white">
-                  {winner?.name || `${winner?.isPlayer ? "Player" : "Computer"} ${winner?.id?.split("-")[1] || ""}`} Wins!
-                </span>
-              </div>
-            </>
+          {isWin && (
+            <h1 className="text-3xl font-bold text-green-500 mb-2">
+              Victory!
+            </h1>
+          )}
+          {winner && (
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div
+                className="w-6 h-6 rounded-full"
+                style={{ backgroundColor: winner?.color || "#4A90E2" }}
+              />
+              <span className="text-xl font-semibold text-white">
+                {winner?.name || `${winner?.isPlayer ? "Player" : "Computer"} ${winner?.id?.split("-")[1] || ""}`} Wins!
+              </span>
+            </div>
           )}
         </div>
 

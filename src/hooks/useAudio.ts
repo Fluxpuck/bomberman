@@ -71,10 +71,34 @@ export function useAudio({
     audioRef.current = new Audio(audioSrc);
     audioRef.current.loop = loop;
     audioRef.current.volume = isMuted ? 0 : volume;
+    const audio = audioRef.current;
+
+    // Add event listeners (store references so cleanup can remove the exact
+    // same functions that were registered)
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => setIsPlaying(false);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+
+    // Chrome blocks autoplay until the user interacts with the page. When
+    // the first play() is rejected, retry on the next click or key press.
+    const handleUnlock = () => {
+      audio
+        .play()
+        .then(() => {
+          window.removeEventListener("pointerdown", handleUnlock);
+          window.removeEventListener("keydown", handleUnlock);
+        })
+        .catch(() => {
+          // Still blocked; keep the listeners for the next interaction.
+        });
+    };
 
     // Try to autoplay if requested
     if (autoPlay) {
-      const playPromise = audioRef.current.play();
+      const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
@@ -83,19 +107,11 @@ export function useAudio({
           .catch((error) => {
             console.log("Autoplay prevented, waiting for user interaction", error);
             setIsPlaying(false);
+            window.addEventListener("pointerdown", handleUnlock);
+            window.addEventListener("keydown", handleUnlock);
           });
       }
     }
-
-    // Add event listeners (store references so cleanup can remove the exact
-    // same functions that were registered)
-    const audio = audioRef.current;
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
 
     // Cleanup on unmount
     return () => {
@@ -105,6 +121,8 @@ export function useAudio({
         audio.removeEventListener('play', handlePlay);
         audio.removeEventListener('pause', handlePause);
         audio.removeEventListener('ended', handleEnded);
+        window.removeEventListener("pointerdown", handleUnlock);
+        window.removeEventListener("keydown", handleUnlock);
       }
     };
   }, [isClient, audioSrc, loop, autoPlay]);

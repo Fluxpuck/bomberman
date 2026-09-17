@@ -194,6 +194,7 @@ class GameTracker {
   private _startTime: number = 0;
   private _pauseTime: number = 0;
   private _pausedDuration: number = 0;
+  private _stoppedTimeElapsedMs: number = 0;
   private _isRunning: boolean = false;
   private _isPaused: boolean = false;
 
@@ -210,6 +211,7 @@ class GameTracker {
   startGame(): void {
     this._startTime = Date.now();
     this._pausedDuration = 0;
+    this._stoppedTimeElapsedMs = 0;
     this._isRunning = true;
     this._isPaused = false;
   }
@@ -230,6 +232,9 @@ class GameTracker {
   }
 
   stopGame(): void {
+    if (this._isRunning) {
+      this._stoppedTimeElapsedMs = this.timeElapsedMs;
+    }
     this._isRunning = false;
     this._isPaused = false;
   }
@@ -243,7 +248,7 @@ class GameTracker {
   }
 
   get timeElapsedMs(): number {
-    if (!this._isRunning) return 0;
+    if (!this._isRunning) return this._stoppedTimeElapsedMs;
     if (this._isPaused) {
       // If paused, return time elapsed up to the pause point
       return this._pauseTime - this._startTime - this._pausedDuration;
@@ -320,6 +325,7 @@ class GameTracker {
     this._startTime = 0;
     this._pauseTime = 0;
     this._pausedDuration = 0;
+    this._stoppedTimeElapsedMs = 0;
     this._isRunning = false;
     this._isPaused = false;
   }

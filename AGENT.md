@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-**lo-fi-bomberman** is a browser-based Bomberman game built with Next.js 14 (App Router), TypeScript, and Tailwind CSS. It supports 1-4 players (1 human + up to 3 AI opponents) with bomb placement, destructible barrels, power-ups, and a timed game mode.
+**lo-fi-bomberman** is a browser-based Bomberman game built with Next.js 16 (App Router), TypeScript, and Tailwind CSS. It supports 1-4 players (1 human + up to 3 AI opponents) with bomb placement, destructible barrels, power-ups, and a timed game mode.
 
 The game loop and rendering are **imperative DOM manipulation** driven by `requestAnimationFrame`, not React state. React is used only for the surrounding UI (screens, HUDs, audio controls). The game grid is a real DOM element built with `document.createElement`.
 
@@ -15,17 +15,17 @@ Dependencies must be installed first (`yarn install`) — `node_modules` is giti
 - `yarn dev` — start the Next.js dev server (visit `http://localhost:3000`)
 - `yarn build` — production build
 - `yarn start` — run the production build
-- `yarn lint` — run ESLint (`next/core-web-vitals`)
+- `yarn lint` — run ESLint (`eslint .` with `next/core-web-vitals`)
 - `yarn typecheck` — run `tsc --noEmit`
 
 There is **no test framework** configured. There are no unit/integration/e2e tests.
 
 ## Tech Stack
 
-- **Next.js 14.2.5** (App Router) + **React 18** + **TypeScript 5.5** (strict mode)
+- **Next.js 16.3.5** (App Router, Turbopack) + **React 19.2** + **TypeScript 5.5** (strict mode)
 - **Tailwind CSS 3.4** for UI styling; game elements use inline styles
 - Path alias: `@/*` maps to `./src/*` (see `tsconfig.json`)
-- ESLint config: `next/core-web-vitals` (see `.eslintrc.json`)
+- ESLint config: `next/core-web-vitals` flat config (see `eslint.config.mjs`)
 
 ## Architecture
 
