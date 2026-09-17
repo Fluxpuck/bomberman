@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BomberState, createBomberVisual } from "../game/assets/character";
+import { CHARACTER_CONFIG, GRID_PATTERN } from "../game/core/config";
 import { grid, updateGridLayout } from "../game/grid";
 import { characterManager } from "../game/player";
-import { GRID_PATTERN } from "../game/core/config";
 import { GameMode } from "../types/game";
-import { createBomberVisual, BomberState } from "../game/assets/character";
 
 interface GameProps {
   mode: GameMode;
@@ -103,7 +103,9 @@ export default function Game({ mode }: GameProps) {
         position: "absolute",
         left: `${char.position.x}px`,
         top: `${char.position.y}px`,
-        transition: isShowingDamage ? "none" : "all 0.5s ease",
+        transition: isShowingDamage
+          ? "none"
+          : `all ${CHARACTER_CONFIG.moveTransitionMs}ms ease-in-out`,
         zIndex: "10",
       });
 

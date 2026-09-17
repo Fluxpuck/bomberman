@@ -1,14 +1,20 @@
 import { Direction, GridPosition } from "../types/game";
-import { Computer, characterManager } from "./player";
-import { moveCharacter, placeBomb, getDangerCells } from "./engine";
-import { grid, getCellAt, gridRows, gridCols, isWalkable } from "./grid";
 import { predictBlastCells } from "./animations";
+import { BOMB_CONFIG } from "./core/config";
+import {
+    getActiveBlastCells,
+    getDangerCells,
+    moveCharacter,
+    placeBomb
+} from "./engine";
+import { getCellAt, grid, gridCols, gridRows, isWalkable } from "./grid";
+import { Computer, characterManager } from "./player";
 
 // =========================
 // Tuning
 // =========================
-const NORMAL_DELAY_RANGE: [number, number] = [300, 550];
-const FLEE_DELAY_RANGE: [number, number] = [120, 200];
+const NORMAL_DELAY_RANGE: [number, number] = [700, 1000];
+const FLEE_DELAY_RANGE: [number, number] = [350, 500];
 // Don't bother chasing an enemy that's farther than this many walkable
 // steps away — keeps computers from beelining across the whole map the
 // instant the round starts.
@@ -18,6 +24,15 @@ const IDLE_BOMB_CHANCE = 0.04;
 // How many recently-visited cells to remember, to discourage immediately
 // backtracking and oscillating in place.
 const RECENT_CELLS_MEMORY = 6;
+// Steps a fleeing computer can realistically take before a freshly placed
+// bomb goes off: the first flee step happens on the very next frame
+// (lastMoveAt isn't updated when it bombs), and each further step takes at
+// most FLEE_DELAY_RANGE[1] ms, so floor(fuseDuration / FLEE_DELAY_RANGE[1])
+// steps always complete before the fuse ends.
+const ESCAPE_MAX_STEPS = Math.max(
+  1,
+  Math.floor(BOMB_CONFIG.fuseDuration / FLEE_DELAY_RANGE[1])
+);
 
 const DIRECTION_DELTAS: Record<Direction, { row: number; col: number }> = {
   [Direction.UP]: { row: -1, col: 0 },
@@ -94,14 +109,6 @@ function findBarrels(): GridPosition[] {
 
 function findPowerups(): GridPosition[] {
   return findCellsWhere((cell) => cell.dataset.powerup !== undefined);
-}
-
-function isAdjacentToBarrel(pos: GridPosition): boolean {
-  return ALL_DIRECTIONS.some((dir) => {
-    const d = DIRECTION_DELTAS[dir];
-    const cell = getCellAt(pos.row + d.row, pos.col + d.col);
-    return !!cell && (cell.dataset as any).barrel === "1";
-  });
 }
 
 // =========================
@@ -275,11 +282,18 @@ function chooseEmergencyStep(
 
 /**
  * Decides whether to place a bomb this tick: only if there's a good reason
- * (a barrel to crack open, or an enemy in the blast line) AND an escape
- * route exists afterward. This is the fix for the AI trapping and killing
- * itself with its own bombs.
+ * (a barrel or an enemy in the blast line) AND an escape
+ * route exists afterward. An escape route is a safe walkable cell reachable
+ * within ESCAPE_MAX_STEPS; walking through cells a still-ticking bomb will
+ * hit is allowed, only currently-exploding cells are impassable. This is
+ * the fix for the AI trapping and killing itself with its own bombs.
+ * Returns true when a bomb was actually placed.
  */
-function maybePlaceBomb(computer: Computer, danger: Set<string>): void {
+function maybePlaceBomb(
+  computer: Computer,
+  danger: Set<string>,
+  activeBlast: Set<string>
+): boolean {
   const pos = computer.gridPosition;
 
   const hypotheticalBlast = predictBlastCells(grid, pos, computer.bombRange);
@@ -300,26 +314,31 @@ function maybePlaceBomb(computer: Computer, danger: Set<string>): void {
         )
     );
 
-  const wantsToBomb =
-    isAdjacentToBarrel(pos) ||
-    wouldHitEnemy ||
-    Math.random() < IDLE_BOMB_CHANCE;
+  const wouldHitBarrel = hypotheticalBlast.some((cell) => {
+    const target = getCellAt(cell.row, cell.col);
+    return !!target && (target.dataset as any).barrel === "1";
+  });
 
-  if (!wantsToBomb) return;
+  const wantsToBomb =
+    wouldHitBarrel || wouldHitEnemy || Math.random() < IDLE_BOMB_CHANCE;
+
+  if (!wantsToBomb) return false;
 
   const escapeRoute = bfsPath(
     pos,
-    (row, col) => isWalkable(row, col) && !hypotheticalDanger.has(cellKey(row, col)),
-    { avoid: hypotheticalDanger, maxSteps: 6 }
+    (row, col) =>
+      isWalkable(row, col) && !hypotheticalDanger.has(cellKey(row, col)),
+    { avoid: activeBlast, maxSteps: ESCAPE_MAX_STEPS }
   );
-  if (!escapeRoute) return;
+  if (!escapeRoute) return false;
 
-  placeBomb(computer);
+  return placeBomb(computer);
 }
 
 function decideAndAct(
   computer: Computer,
   danger: Set<string>,
+  activeBlast: Set<string>,
   now: number
 ): void {
   const state = getState(computer.id);
@@ -327,9 +346,7 @@ function decideAndAct(
   const inDanger = danger.has(cellKey(pos.row, pos.col));
 
   if (now - state.lastMoveAt < state.nextDelayMs) {
-    // Still on cooldown for movement — bomb placement isn't gated by this,
-    // since placeBomb() enforces its own cooldown/inventory limits.
-    if (!inDanger) maybePlaceBomb(computer, danger);
+    // Still on cooldown for movement — wait for the next decision tick.
     return;
   }
 
@@ -337,7 +354,7 @@ function decideAndAct(
     const safePath = bfsPath(
       pos,
       (row, col) => isWalkable(row, col) && !danger.has(cellKey(row, col)),
-      { avoid: danger }
+      { avoid: activeBlast }
     );
     const dir = safePath
       ? directionTo(pos, safePath[0])
@@ -351,10 +368,13 @@ function decideAndAct(
     return;
   }
 
-  maybePlaceBomb(computer, danger);
+  const didPlaceBomb = maybePlaceBomb(computer, danger, activeBlast);
+  if (didPlaceBomb) return;
 
   const objectiveStep = chooseObjectiveStep(computer, danger);
-  const dir = objectiveStep
+  const canStepToObjective =
+    objectiveStep !== null && isWalkable(objectiveStep.row, objectiveStep.col);
+  const dir = canStepToObjective
     ? directionTo(pos, objectiveStep)
     : chooseRoamStep(computer, danger, state);
 
@@ -378,11 +398,12 @@ export function updateComputerPlayers(_deltaTime: number): void {
   if (computers.length === 0) return;
 
   const danger = getDangerCells();
+  const activeBlast = getActiveBlastCells();
   const now = Date.now();
 
   for (const computer of computers) {
     if (!computer.isAlive()) continue;
-    decideAndAct(computer, danger, now);
+    decideAndAct(computer, danger, activeBlast, now);
   }
 }
 

@@ -19,13 +19,13 @@ export const PLAYER_CONFIG = {
 
 export const CHARACTER_CONFIG = {
   // Must match the CSS transition duration used for character movement in game.tsx
-  moveTransitionMs: 500,
+  moveTransitionMs: 300,
 };
 
 export const BOMB_CONFIG = {
-  fuseDuration: 1000,
-  explodeDuration: 750,
-  blastRadius: 2,
+  fuseDuration: 1250,
+  explodeDuration: 350,
+  blastRadius: 1,
   maxBlastRadius: 6,
   bombs: 1,
   maxBombs: 5,

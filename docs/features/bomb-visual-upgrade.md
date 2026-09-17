@@ -24,10 +24,10 @@ a single bomb-centered graphic with arms that overlap neighboring cells.
   `fuseMs ?? BOMB_CONFIG.fuseDuration`), then on timeout:
   - Removes dynamite visual, clears solid/bomb flags.
   - Computes `affected: GridPosition[]` (lines 135-302): starts at center, walks outward
-    in 4 directions (`dirs`, lines 155-160) for `outward = range - 1` steps
+    in 4 directions (`dirs`, lines 155-160) for up to `range` steps
     (`range = opts.bombRange ?? BOMB_CONFIG.blastRadius`, clamped to
-    `BOMB_CONFIG.maxBlastRadius`) — **range is total reach including center tile**
-    (comment at lines 152-153). Stops early at grid edge or solid/wall cell; barrels/crates
+    `BOMB_CONFIG.maxBlastRadius`) — **range is the number of tiles reached outward from the center**
+    Stops before indestructible blocks and includes destructible blocks before stopping; barrels/crates
     are included then destroyed, walls stop propagation (lines 169-181).
   - Per affected cell: destroys barrel/crate (removes child, clears flags, awards score,
     chance-spawns powerup per `POWERUP_CONFIG.dropChance`, lines 257-282), chain-detonates
@@ -36,13 +36,13 @@ a single bomb-centered graphic with arms that overlap neighboring cells.
 - `src/game/animations.ts:57-72` — `createExplosion()`: per-cell `<div>` with
   `radial-gradient` (yellow→orange→red→transparent), `borderRadius:6px`.
 - `src/game/animations.ts:77-87` — `animateExplosion()`: scale/opacity keyframe
-  (`0.6→1→1.05→1→0`, fade in/out) over `BOMB_CONFIG.explodeDuration` (750ms default), then
+  (`0.6→1→1.05→1→0`, fade in/out) over `BOMB_CONFIG.explodeDuration` (350ms default), then
   `setTimeout` removes the puff.
 - `src/game/engine.ts:171-241` — `placeBomb()`: gameplay entry point calling `armDynamite`,
   wires `onDetonate`/`onExplode` into `tracker.applyExplosionDamage` and
   inventory/active-bomb-count bookkeeping (logic, not visuals — unaffected by this upgrade).
-- `src/game/core/config.ts:20-28` — `BOMB_CONFIG`: `fuseDuration:1000`,
-  `explodeDuration:750`, `blastRadius:2` default, `maxBlastRadius:6`, `bombs`/`maxBombs`/
+- `src/game/core/config.ts:20-28` — `BOMB_CONFIG`: `fuseDuration:1250`,
+  `explodeDuration:350`, `blastRadius:1` default, `maxBlastRadius:6`, `bombs`/`maxBombs`/
   `cooldown`.
 - Per-bomb range override: `playerTracker.bombRange` (`src/game/hooks/tracker.ts:104-106`,
   sourced from `Character.bombRange` in `src/game/player.ts`, increased via power-ups).
@@ -52,12 +52,8 @@ a single bomb-centered graphic with arms that overlap neighboring cells.
 Colors: `ink #131c2b`, `hot` = `flame` prop (default `#ff9a2b`), `hotPale #ffe9a8`.
 
 `reach = range * 120` — arms are computed directly in px against the 120px tile unit,
-matching the game's own per-tile outward walk almost exactly (game's `range` already
-means "tiles reached from center," same semantics as the design's `range` prop — confirm
-exact off-by-one alignment against the "range = total reach including center" comment in
-`animations.ts:152-153` before wiring up, since the design's `reach = range*120` measures
-from the bomb's own tile center outward, which should match if `range` is used identically
-in both places).
+matching the game's per-tile outward walk. Both gameplay and visual blast reach use
+`range` as the number of tiles extending from the bomb's center.
 
 Structure — `mount` > `scaler` > `shock`, `armH`, `armV`, `armHInner`, `armVInner`,
 `flash`, `flashCore`, `shadow`, `ticker` (contains `ball`, `shine`, `band`, `cap`, `fuse`,
@@ -141,7 +137,7 @@ pale core inside a hot outline keeps it legible over both floor and crates."*
      length lines up with the same cells `affected` computes as hit (should match exactly
      if `range` means the same thing in both places — flagged above).
    - Timing: `animation: blastFlicker .28s` loops for the visual's lifetime; total duration
-     still governed by `BOMB_CONFIG.explodeDuration` (750ms) — keep the existing
+     still governed by `BOMB_CONFIG.explodeDuration` (350ms) — keep the existing
      `setTimeout`-based removal, just removing the new arm-graphic element instead of N puffs.
 5. Chain-detonation (recursive `armDynamite` with `fuseMs:0`, lines 214-254) — unaffected
    by visual change, but verify two overlapping arm-graphics (from two chained bombs) don't

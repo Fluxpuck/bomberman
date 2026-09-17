@@ -1,12 +1,12 @@
-import { GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./core/config";
-import { grid, isWalkable, gridRows, gridCols } from "./grid";
-import { Character, Player, Computer, characterManager } from "./player";
-import { tracker } from "./hooks/tracker";
+import { Direction, GameState, GridPosition, Position } from "../types/game";
+import { resetAIState, updateComputerPlayers } from "./ai";
 import { armDynamite, getPendingBombs, predictBlastCells } from "./animations";
-import { checkPowerupPickup } from "./powerup";
+import { CHARACTER_CONFIG, GAME_CONFIG, GRID_PATTERN, PLAYER_CONFIG } from "./core/config";
+import { grid, gridCols, gridRows, isWalkable } from "./grid";
 import { playSound } from "./hooks/sound";
-import { Direction, GridPosition, Position, GameState } from "../types/game";
-import { updateComputerPlayers, resetAIState } from "./ai";
+import { tracker } from "./hooks/tracker";
+import { Character, Computer, Player, characterManager } from "./player";
+import { checkPowerupPickup } from "./powerup";
 
 // =========================
 // Engine State
@@ -21,9 +21,9 @@ interface BlastCell {
   position: GridPosition;
   endTime: number;
   ownerId: string;
+  hitCharacterIds: Set<string>;
 }
 const activeBlastCells: BlastCell[] = [];
-const BLAST_DURATION_MS = 350;
 
 // Game event callbacks
 let onPlayerDead: (() => void) | null = null;
@@ -37,9 +37,24 @@ let onBombExplode: ((cells: GridPosition[], playerId: string) => void) | null =
 // =========================
 const keyState: Record<string, boolean> = {};
 const keyProcessed: Record<string, boolean> = {};
+const directionByKey: Record<string, Direction> = {
+  ArrowUp: Direction.UP,
+  w: Direction.UP,
+  W: Direction.UP,
+  ArrowDown: Direction.DOWN,
+  s: Direction.DOWN,
+  S: Direction.DOWN,
+  ArrowLeft: Direction.LEFT,
+  a: Direction.LEFT,
+  A: Direction.LEFT,
+  ArrowRight: Direction.RIGHT,
+  d: Direction.RIGHT,
+  D: Direction.RIGHT,
+};
 
 const lastBombTimeByPlayer: Record<string, number> = {};
-const BOMB_COOLDOWN_MS = 250;
+const BOMB_COOLDOWN_MS = 350;
+let lastPlayerMoveAt = 0;
 
 // =========================
 // Helper Functions
@@ -208,18 +223,22 @@ export function placeBomb(character: Character): boolean {
     bombRange: playerTracker.bombRange,
     ownerId: character.id,
     onDetonate: (cells, duration) => {
-      // Apply damage to characters in explosion area
-      tracker.applyExplosionDamage(cells, character.id);
-
-      // Add cells to active blast cells list
-      const blastEndTime = Date.now() + BLAST_DURATION_MS;
+      // Add cells to active blast cells list before checking damage so the
+      // detonation and movement paths use the same hit rules.
+      const blastEndTime = Date.now() + duration;
       cells.forEach((cell) => {
         activeBlastCells.push({
           position: { row: cell.row, col: cell.col },
           endTime: blastEndTime,
           ownerId: character.id,
+          hitCharacterIds: new Set<string>(),
         });
       });
+
+      // Apply the initial hit through the same path used when entering a blast.
+      for (const target of characterManager.getAll()) {
+        checkBlastCellDamage(target);
+      }
 
       // Trigger bomb explode callback
       if (onBombExplode) {
@@ -255,37 +274,25 @@ function handlePlayerInput() {
   const player = humanPlayers[0];
   if (!player.isAlive()) return;
 
-  // Handle movement - one cell per key press
+  // Move one cell per repeat interval while a direction key is held.
   const moveKeys = [
     { keys: ["ArrowUp", "w", "W"], direction: Direction.UP },
     { keys: ["ArrowDown", "s", "S"], direction: Direction.DOWN },
     { keys: ["ArrowLeft", "a", "A"], direction: Direction.LEFT },
     { keys: ["ArrowRight", "d", "D"], direction: Direction.RIGHT },
   ];
+  const now = Date.now();
+  const canRepeatMove =
+    now - lastPlayerMoveAt >= CHARACTER_CONFIG.moveTransitionMs;
 
-  // Process each movement direction
-  for (const { keys, direction } of moveKeys) {
-    // Check if any key for this direction is pressed
-    const isKeyPressed = keys.some((key) => keyState[key]);
+  if (canRepeatMove) {
+    for (const { keys, direction } of moveKeys) {
+      const isKeyPressed = keys.some((key) => keyState[key]);
+      if (!isKeyPressed) continue;
 
-    // Check if all keys for this direction were previously released
-    const allKeysWereReleased = keys.every((key) => !keyProcessed[key]);
-
-    // Move only on initial key press (not on hold)
-    if (isKeyPressed && allKeysWereReleased) {
       moveCharacter(player, direction);
-
-      // Mark all keys for this direction as processed
-      keys.forEach((key) => {
-        keyProcessed[key] = true;
-      });
-    }
-
-    // Reset processed state when keys are released
-    if (!isKeyPressed) {
-      keys.forEach((key) => {
-        keyProcessed[key] = false;
-      });
+      lastPlayerMoveAt = now;
+      break;
     }
   }
 
@@ -321,6 +328,15 @@ function setupInputListeners() {
         resumeGame();
       }
       return; // Don't track Escape in keyState
+    }
+
+    const direction = directionByKey[e.key];
+    if (!e.repeat && direction !== undefined && gameState === GameState.PLAYING) {
+      const player = characterManager.getPlayers()[0];
+      if (player?.isAlive()) {
+        moveCharacter(player, direction);
+        lastPlayerMoveAt = Date.now();
+      }
     }
 
     keyState[e.key] = true;
@@ -371,6 +387,7 @@ function checkBlastCellDamage(character: Character): void {
 
     // Skip expired blast cells
     if (currentTime > blastCell.endTime) continue;
+    if (blastCell.hitCharacterIds.has(character.id)) continue;
 
     // Check if character is in this blast cell
     if (
@@ -380,13 +397,10 @@ function checkBlastCellDamage(character: Character): void {
       // Get player tracker
       const playerTracker = tracker.getPlayer(character.id);
       if (playerTracker) {
-        // Apply damage
+        blastCell.hitCharacterIds.add(character.id);
+
+        // Apply one hit and start the immunity window.
         playerTracker.decrementLife();
-
-        // Character's takeDamage method will start the damage animation
-        character.takeDamage();
-
-        // Set player immune after taking damage
         character.setImmune();
 
         // If this killed the player and it wasn't self-damage, credit the kill
@@ -408,18 +422,29 @@ function checkBlastCellDamage(character: Character): void {
 }
 
 /**
+ * Cells that are actively exploding right now (non-expired blast cells).
+ * Keyed "row,col" for O(1) lookup. Used by the AI to know which cells are
+ * truly impassable — cells a still-ticking bomb would hit remain walkable.
+ */
+export function getActiveBlastCells(): Set<string> {
+  const active = new Set<string>();
+
+  const currentTime = Date.now();
+  for (const blastCell of activeBlastCells) {
+    if (currentTime > blastCell.endTime) continue;
+    active.add(`${blastCell.position.row},${blastCell.position.col}`);
+  }
+
+  return active;
+}
+
+/**
  * Cells that are either actively exploding right now, or about to be hit by
  * a bomb that's still ticking. Keyed "row,col" for O(1) lookup. Used by the
  * AI for danger-avoidance.
  */
 export function getDangerCells(): Set<string> {
-  const danger = new Set<string>();
-
-  const currentTime = Date.now();
-  for (const blastCell of activeBlastCells) {
-    if (currentTime > blastCell.endTime) continue;
-    danger.add(`${blastCell.position.row},${blastCell.position.col}`);
-  }
+  const danger = getActiveBlastCells();
 
   for (const pending of getPendingBombs()) {
     const cells = predictBlastCells(

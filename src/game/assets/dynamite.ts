@@ -181,8 +181,8 @@ export function createBlastVisual(
   );
   scaler.appendChild(shock);
 
-  // Build one half-arm per direction, each independently sized so the
-  // graphic stops exactly at the actual blocked/open tile in that direction.
+  // Build one arm per direction. Fire thickness stays narrow while its length
+  // reaches the full distance covered by each affected tile.
   const addArm = (dir: "up" | "down" | "left" | "right", tiles: number) => {
     const len = Math.max(0, tiles) * 120;
     if (len <= 0) return;
@@ -196,22 +196,22 @@ export function createBlastVisual(
       box(
         horizontal
           ? {
-              left: dir === "right" ? "56px" : `${64 - len}px`,
+              left: dir === "right" ? "56px" : `${-len}px`,
               top: "14px",
-              width: `${len + 8}px`,
+              width: `${len + 64}px`,
               height: "92px",
               borderRadius: "46px",
-              background: `linear-gradient(to ${toward},${hot} 0%,${hot} 68%,${hot}cc 92%,${hot}00 100%)`,
+              background: `linear-gradient(to ${toward},${hot} 0%,${hot} 82%,${hot}e6 100%)`,
               filter: "blur(2px)",
               animation: "blastFlicker .28s ease-in-out infinite",
             }
           : {
               left: "14px",
-              top: dir === "down" ? "56px" : `${64 - len}px`,
+              top: dir === "down" ? "56px" : `${-len}px`,
               width: "92px",
-              height: `${len + 8}px`,
+              height: `${len + 64}px`,
               borderRadius: "46px",
-              background: `linear-gradient(to ${toward},${hot} 0%,${hot} 68%,${hot}cc 92%,${hot}00 100%)`,
+              background: `linear-gradient(to ${toward},${hot} 0%,${hot} 82%,${hot}e6 100%)`,
               filter: "blur(2px)",
               animation: "blastFlicker .28s ease-in-out infinite",
             }

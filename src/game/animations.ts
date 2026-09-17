@@ -1,19 +1,19 @@
-import {
-  BOMB_CONFIG,
-  GRID_PATTERN,
-  SCORE_CONFIG,
-  POWERUP_CONFIG,
-} from "./core/config";
 import type { GridPosition } from "../types/game";
 import {
-  createBombVisual,
-  createBlastVisual,
-  BlastReach,
+    BlastReach,
+    createBlastVisual,
+    createBombVisual,
 } from "./assets/dynamite";
 import { createPowerUp, PowerupType } from "./assets/powerups";
-import { hasPowerup } from "./powerup";
-import { tracker } from "./hooks/tracker";
+import {
+    BOMB_CONFIG,
+    GRID_PATTERN,
+    POWERUP_CONFIG,
+    SCORE_CONFIG,
+} from "./core/config";
 import { playSound } from "./hooks/sound";
+import { tracker } from "./hooks/tracker";
+import { hasPowerup } from "./powerup";
 
 // Track bomb timers to prevent double explosions
 const bombTimers: Map<string, number> = new Map();
@@ -64,16 +64,17 @@ function getCellFlags(grid: HTMLElement, row: number, col: number) {
   const exists = !!cell;
   const solid = !cell || cell.dataset.solid === "1";
   const barrel = !!cell && (cell.dataset as any).barrel === "1";
+  const bomb = !!cell && (cell.dataset as any).bomb === "1";
   const powerup = !!cell && hasPowerup(cell);
-  return { cell, exists, solid, barrel, powerup } as const;
+  return { cell, exists, solid, barrel, bomb, powerup } as const;
 }
 
 /**
- * Walks outward from `at` in all 4 directions up to `range` tiles (range
- * counts the center tile itself, so `range - 1` tiles outward), stopping
- * early at grid edges or solid/wall cells exactly like a real explosion
- * does. Shared by the real explosion (armDynamite) and the AI's danger
- * prediction so the two can never disagree about what a bomb will hit.
+ * Walks outward from `at` in all 4 directions up to `range` tiles, stopping
+ * early at grid edges or solid/wall cells exactly like a real explosion does.
+ * The center cell is always included in the affected cells. Shared by the
+ * real explosion (armDynamite) and the AI's danger prediction so the two can
+ * never disagree about what a bomb will hit.
  */
 export function computeBlast(
   grid: HTMLElement,
@@ -81,7 +82,7 @@ export function computeBlast(
   range: number
 ): { affected: GridPosition[]; reach: BlastReach } {
   const affected: GridPosition[] = [{ row: at.row, col: at.col }];
-  const outward = Math.max(0, range - 1);
+  const outward = Math.max(0, range);
   const dirs: Array<[name: keyof BlastReach, dr: number, dc: number]> = [
     ["up", -1, 0],
     ["down", 1, 0],
@@ -99,17 +100,16 @@ export function computeBlast(
       // Stop if we hit the edge of the grid
       if (!flags.exists) break;
 
-      // Add this cell to affected cells
+      // Indestructible blocks stop the blast but are not part of its damage area.
+      const isIndestructible =
+        flags.solid && !flags.barrel && !flags.bomb && !flags.powerup;
+      if (isIndestructible) break;
+
+      // Open cells are traversable. Barrels and bombs are affected, then stop
+      // propagation so the blast cannot pass through an occupied cell.
       affected.push({ row: r, col: c });
       reach[name] = step;
-
-      // Stop if we hit a solid wall or barrel, but continue through powerups
-      // (we include the cell in the affected list for visual effects)
-      if (flags.solid && !flags.powerup) {
-        // If it's a barrel, we want to destroy it
-        // If it's a solid wall, we want to stop the explosion
-        break;
-      }
+      if (flags.solid && (flags.barrel || flags.bomb)) break;
     }
   }
 
