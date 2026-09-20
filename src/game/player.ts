@@ -9,6 +9,7 @@ import {
   CHARACTER_CONFIG,
   GRID_PATTERN,
   PLAYER_CONFIG,
+  POWERUP_CONFIG
 } from "./core/config";
 import { playSound } from "./hooks/sound";
 
@@ -35,12 +36,18 @@ function defaultNameForId(id: string): string {
 export abstract class Character {
   // Damage cooldown tracking
   private _damageCooldownEndTime: number = 0;
-  private static readonly DAMAGE_COOLDOWN_MS: number = 500;
+  private static readonly DAMAGE_COOLDOWN_MS: number = 800;
   // Damage animation tracking
   private _damageAnimationEndTime: number = 0;
   private static readonly DAMAGE_ANIMATION_MS: number = 250;
   // Walking animation tracking (true for the walk window after a move)
   private _walkingEndTime: number = 0;
+  // Shield power-up: absorbs the next hit instead of losing a life, and
+  // expires on its own after a fixed duration
+  private _hasShield: boolean = false;
+  private _shieldExpiryTime: number = 0;
+  // Shield-block visual tracking (blue blink window after an absorbed hit)
+  private _shieldBlockEndTime: number = 0;
 
   // Last direction moved, used to orient the character's sprite
   public facing: Direction = Direction.DOWN;
@@ -115,6 +122,38 @@ export abstract class Character {
     return Date.now() < this._damageCooldownEndTime;
   }
 
+  public grantShield(): void {
+    this._hasShield = true;
+    this._shieldExpiryTime = Date.now() + POWERUP_CONFIG.shieldDurationMs;
+  }
+
+  public hasShieldActive(): boolean {
+    return this._hasShield && Date.now() < this._shieldExpiryTime;
+  }
+
+  /** True while the shield is active but close to expiring. */
+  public isShieldExpiring(): boolean {
+    if (!this.hasShieldActive()) return false;
+    return (
+      this._shieldExpiryTime - Date.now() <= POWERUP_CONFIG.shieldBlinkMs
+    );
+  }
+
+  /**
+   * Consume the shield if one is active. Returns true when the shield
+   * absorbed the hit (no life should be lost), false otherwise.
+   */
+  public consumeShield(): boolean {
+    if (!this.hasShieldActive()) return false;
+    this._hasShield = false;
+    this._shieldBlockEndTime = Date.now() + Character.DAMAGE_COOLDOWN_MS;
+    return true;
+  }
+
+  public isShowingShieldBlock(): boolean {
+    return Date.now() < this._shieldBlockEndTime;
+  }
+
   public addBomb(): void {
     this.inventory = Math.min(this.inventory + 1, BOMB_CONFIG.maxBombs);
   }
@@ -132,8 +171,23 @@ export abstract class Character {
     isImmune: boolean;
     isWalking: boolean;
     isHurt: boolean;
+    hasShield: boolean;
+    isShieldBlock: boolean;
+    isShieldExpiring: boolean;
   }): void {
     const now = Date.now();
+    this._hasShield = flags.hasShield;
+    // Guests don't know the real expiry — approximate with the blink window
+    // so the expiring indicator matches the host.
+    this._shieldExpiryTime = flags.hasShield
+      ? now +
+        (flags.isShieldExpiring
+          ? POWERUP_CONFIG.shieldBlinkMs
+          : POWERUP_CONFIG.shieldDurationMs)
+      : 0;
+    this._shieldBlockEndTime = flags.isShieldBlock
+      ? now + Character.DAMAGE_COOLDOWN_MS
+      : 0;
     this._damageCooldownEndTime = flags.isImmune
       ? now + Character.DAMAGE_COOLDOWN_MS
       : 0;

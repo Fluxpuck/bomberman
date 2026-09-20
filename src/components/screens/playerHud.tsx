@@ -1,4 +1,3 @@
-import React from "react";
 import { PlayerStats } from "../../game/hooks/tracker";
 
 type CornerPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -9,17 +8,19 @@ interface PlayerHUDProps {
 }
 
 export function PlayerHUD({ player, corner }: PlayerHUDProps) {
-  // Determine position styles based on corner
-  const getPositionStyles = (): React.CSSProperties => {
+  // Determine position classes based on corner (tighter on small screens).
+  // In portrait orientation the parent grid lays these out statically, so
+  // the offsets are inert there.
+  const getPositionClasses = (): string => {
     switch (corner) {
       case "top-left":
-        return { top: "1rem", left: "1rem" };
+        return "top-2 left-2 sm:top-4 sm:left-4";
       case "top-right":
-        return { top: "1rem", right: "1rem" };
+        return "top-2 right-2 sm:top-4 sm:right-4";
       case "bottom-left":
-        return { bottom: "1rem", left: "1rem" };
+        return "bottom-2 left-2 sm:bottom-4 sm:left-4";
       case "bottom-right":
-        return { bottom: "1rem", right: "1rem" };
+        return "bottom-2 right-2 sm:bottom-4 sm:right-4";
     }
   };
 
@@ -33,9 +34,8 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
 
   return (
     <div
-      className="fixed bg-gray-900/80 border-2 rounded-lg overflow-hidden z-40 w-48"
+      className={`fixed portrait:static bg-gray-900/80 border-2 rounded-lg overflow-hidden z-40 w-32 sm:w-48 portrait:w-full ${getPositionClasses()}`}
       style={{
-        ...getPositionStyles(),
         borderColor: player.color,
       }}
     >
@@ -43,9 +43,9 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
       <div className="h-1.5" style={{ backgroundColor: player.color }} />
 
       {/* Player info */}
-      <div className="p-3">
-        {/* Player name and score */}
-        <div className="flex justify-between items-center mb-2">
+      <div className="p-2 sm:p-3 portrait:p-2">
+        {/* Player name */}
+        <div className="flex justify-between items-center sm:mb-2 portrait:mb-0">
           <div className="flex items-center gap-1.5">
             <div
               className="w-3 h-3 rounded-full"
@@ -60,14 +60,18 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
               </span>
             )}
           </div>
-          <span className="text-xs text-gray-300">
-            Score: <span className="font-extrabold">{player.score}</span>
-          </span>
         </div>
 
-        {/* Player stats */}
+        {/* Player stats (hidden on small screens and in portrait to keep
+            HUDs compact) */}
         {isAlive ? (
-          <div className="space-y-1 text-sm">
+          <div className="hidden sm:block portrait:hidden space-y-1 text-sm">
+            {/* Score */}
+            <div className="flex justify-between">
+              <span className="text-gray-400">Score</span>
+              <span className="font-extrabold text-white">{player.score}</span>
+            </div>
+
             {/* Lives */}
             <div className="flex justify-between">
               <span className="text-gray-400">Lives</span>
@@ -129,8 +133,10 @@ export function PlayersHUD({ players }: { players: PlayerStats[] }) {
     "bottom-right",
   ];
 
+  // Landscape/desktop: `contents` keeps each HUD fixed in its corner.
+  // Portrait: the wrapper becomes a 2-column grid pinned to the top.
   return (
-    <>
+    <div className="contents portrait:fixed portrait:inset-x-0 portrait:top-0 portrait:grid portrait:grid-cols-2 portrait:gap-1.5 portrait:p-2 portrait:z-40">
       {players.slice(0, 4).map((player, index) => (
         <PlayerHUD
           key={player.id}
@@ -138,6 +144,6 @@ export function PlayersHUD({ players }: { players: PlayerStats[] }) {
           corner={cornerPositions[index]}
         />
       ))}
-    </>
+    </div>
   );
 }

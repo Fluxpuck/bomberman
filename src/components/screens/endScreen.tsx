@@ -40,7 +40,7 @@ export function EndScreen({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 w-96 max-w-full shadow-2xl">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 w-[28rem] max-w-full shadow-2xl">
         {/* Header */}
         <div className="text-center mb-6">
           {isGameOver && (
@@ -76,14 +76,14 @@ export function EndScreen({
               {formatTime(timePlayed)}
             </div>
 
-            {timeLeft > 0 && (
+            {/* {timeLeft > 0 && (
               <>
                 <div className="text-gray-400">Time Left</div>
                 <div className="text-right font-medium text-white">
                   {formatTime(timeLeft)}
                 </div>
               </>
-            )}
+            )} */}
 
             <div className="text-gray-400">Bombs Placed</div>
             <div className="text-right font-medium text-white">
@@ -102,43 +102,47 @@ export function EndScreen({
           </div>
         </div>
 
-        {/* Winner Stats (if applicable) */}
-        {winner && (
+        {/* Player Stats */}
+        {players && players.length > 0 && (
           <div className="bg-gray-800 rounded-lg p-4 mb-6">
-            <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
-              <div
-                className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: winner?.color || "#4A90E2" }}
-              />
-              <span>{winner?.name || `${winner?.isPlayer ? "Player" : "Computer"} Stats`}</span>
-            </h2>
+            {players.map((player) => (
+              <div key={player.id}>
+                <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: player.color }}
+                  />
+                  <span>{player.name} Stats</span>
+                </h2>
 
-            <div className="grid grid-cols-2 gap-y-2 text-sm">
-              <div className="text-gray-400">Score</div>
-              <div className="text-right font-medium text-white">
-                {winner?.score || 0}
-              </div>
+                <div className="grid grid-cols-2 gap-y-2 text-sm">
+                  <div className="text-gray-400">Score</div>
+                  <div className="text-right font-medium text-white">
+                    {player.score}
+                  </div>
 
-              <div className="text-gray-400">Lives Left</div>
-              <div className="text-right font-medium text-white">
-                {winner?.lives || 0}
-              </div>
+                  <div className="text-gray-400">Lives Left</div>
+                  <div className="text-right font-medium text-white">
+                    {player.lives}
+                  </div>
 
-              <div className="text-gray-400">Bombs Placed</div>
-              <div className="text-right font-medium text-white">
-                {winner?.bombsPlaced || 0}
-              </div>
+                  <div className="text-gray-400">Bombs Placed</div>
+                  <div className="text-right font-medium text-white">
+                    {player.bombsPlaced}
+                  </div>
 
-              <div className="text-gray-400">Blocks Destroyed</div>
-              <div className="text-right font-medium text-white">
-                {winner?.blocksDestroyed || 0}
-              </div>
+                  <div className="text-gray-400">Blocks Destroyed</div>
+                  <div className="text-right font-medium text-white">
+                    {player.blocksDestroyed}
+                  </div>
 
-              <div className="text-gray-400">Kills</div>
-              <div className="text-right font-medium text-white">
-                {winner?.kills || 0}
+                  <div className="text-gray-400">Kills</div>
+                  <div className="text-right font-medium text-white">
+                    {player.kills}
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
         )}
 

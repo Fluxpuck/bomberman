@@ -12,6 +12,23 @@ export const GRID_PATTERN = {
   colOffset: 1,
 };
 
+export const GENERATED_MAP = {
+  // Chance each interior cell becomes an indestructible pillar.
+  pillarChance: 0.18,
+  // Breakable coverage is rolled inside this range per generation.
+  coverageMin: 0.6,
+  coverageMax: 0.9,
+  // Regeneration attempts to find a layout where all spawn zones connect.
+  maxAttempts: 50,
+};
+
+export const LAYOUT_CONFIG = {
+  // Vertical space reserved when sizing the grid in portrait orientation:
+  // the player HUD strip on top, and the touch controls + bottom bar below.
+  portraitTopChrome: 112,
+  portraitBottomChrome: 264,
+};
+
 export const PLAYER_CONFIG = {
   defaultLives: 3,
   defaultInventory: 1,
@@ -63,13 +80,13 @@ export const CHARACTER_CONFIG = {
 };
 
 export const BOMB_CONFIG = {
-  fuseDuration: 1250,
-  explodeDuration: 350,
+  fuseDuration: 1400,
+  explodeDuration: 400,
   blastRadius: 1,
   maxBlastRadius: 6,
   maxBombs: 5,
   // Minimum delay between a player's consecutive bomb placements.
-  cooldownMs: 350,
+  cooldownMs: 250,
 };
 
 export const SCORE_CONFIG = {
@@ -79,4 +96,8 @@ export const SCORE_CONFIG = {
 
 export const POWERUP_CONFIG = {
   dropChance: 0.2,
+  // Shield expires after this long if it hasn't absorbed a hit.
+  shieldDurationMs: 15000,
+  // Ring starts blinking this long before the shield expires.
+  shieldBlinkMs: 3000,
 };

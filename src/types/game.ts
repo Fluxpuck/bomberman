@@ -25,6 +25,7 @@ export const DIRECTION_DELTAS: Record<Direction, { row: number; col: number }> =
 
 export enum GameState {
   START = "START",
+  MAP_SELECT = "MAP_SELECT",
   LOBBY = "LOBBY",
   PLAYING = "PLAYING",
   PAUSED = "PAUSED",

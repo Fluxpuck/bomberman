@@ -99,7 +99,7 @@ export function LobbyScreen({
               <button
                 disabled={!name.trim() || joinCode.length !== 4 || connecting}
                 onClick={() => onJoin(joinCode, name.trim())}
-                className="px-5 py-2 rounded-lg font-bold text-white bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 rounded-lg font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Join
               </button>

@@ -47,6 +47,12 @@ export function checkPowerupPickup(character: Character): void {
     playSound("soundFX", "powerup-increaseRange", 0.6);
   }
 
+  // Handle shield powerup
+  else if (powerupType === "shield") {
+    playerTracker.grantShield();
+    playSound("soundFX", "powerup-shield", 0.6);
+  }
+
   // Remove the powerup from the cell
   cell.removeChild(powerupElement);
 }

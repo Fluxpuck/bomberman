@@ -1,3 +1,5 @@
+import { BOMB_CONFIG } from "../core/config";
+
 const INK = "#131c2b";
 const HOT_PALE = "#ffe9a8";
 const DEFAULT_FLAME = "#ff9a2b";
@@ -16,6 +18,8 @@ function ensureKeyframes(): void {
 @keyframes bombSpark{0%,100%{opacity:.5;transform:scale(.75) rotate(0deg)}50%{opacity:1;transform:scale(1.3) rotate(25deg)}}
 @keyframes bombShock{0%{opacity:.7;transform:scale(.6)}100%{opacity:0;transform:scale(1.5)}}
 @keyframes blastFlicker{0%,100%{opacity:1}50%{opacity:.78}}
+@keyframes bombFuse{0%{transform:rotate(24deg) scaleY(1)}100%{transform:rotate(24deg) scaleY(0)}}
+@keyframes bombFuseSpark{0%{top:-4px;left:70px}100%{top:20px;left:58px}}
 `;
   document.head.appendChild(style);
 }
@@ -23,8 +27,13 @@ function ensureKeyframes(): void {
 /**
  * Creates the placed/ticking bomb visual for a cell. Kept tagged with the
  * "dynamite" class so armDynamite's chain-detonation lookup keeps finding it.
+ * `fuseMs` drives the burn-down animation of the fuse; it should match the
+ * real fuse time so the spark reaches the cap as the bomb detonates.
  */
-export function createBombVisual(cellSizePx: number): HTMLDivElement {
+export function createBombVisual(
+  cellSizePx: number,
+  fuseMs: number = BOMB_CONFIG.fuseDuration
+): HTMLDivElement {
   ensureKeyframes();
 
   const scale = cellSizePx / 120;
@@ -95,7 +104,20 @@ export function createBombVisual(cellSizePx: number): HTMLDivElement {
   ticker.appendChild(cap);
 
   const fuse = document.createElement("div");
-  Object.assign(fuse.style, box({ left: "66px", top: "8px", width: "7px", height: "22px", borderRadius: "4px", background: "#c9a06a", transform: "rotate(24deg)" }));
+  Object.assign(
+    fuse.style,
+    box({
+      left: "66px",
+      top: "8px",
+      width: "7px",
+      height: "22px",
+      borderRadius: "4px",
+      background: "#c9a06a",
+      transform: "rotate(24deg)",
+      transformOrigin: "50% 100%",
+      animation: `bombFuse ${Math.max(0, fuseMs)}ms linear forwards`,
+    })
+  );
   ticker.appendChild(fuse);
 
   const spark = document.createElement("div");
@@ -109,7 +131,10 @@ export function createBombVisual(cellSizePx: number): HTMLDivElement {
       borderRadius: "50%",
       background: HOT_PALE,
       boxShadow: `0 0 18px ${DEFAULT_FLAME}, 0 0 6px #fff`,
-      animation: "bombSpark .5s ease-in-out infinite",
+      animation: `bombSpark .5s ease-in-out infinite, bombFuseSpark ${Math.max(
+        0,
+        fuseMs
+      )}ms linear forwards`,
     })
   );
   ticker.appendChild(spark);

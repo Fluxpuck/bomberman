@@ -1,11 +1,12 @@
 // Types of powerups
-export type PowerupType = "extraBomb" | "increaseRange";
+export type PowerupType = "extraBomb" | "increaseRange" | "shield";
 
 const INK = "#0d1626";
 
 const PALETTE: Record<PowerupType, { accent: string; deep: string; pale: string }> = {
   extraBomb: { accent: "#38d6c4", deep: "#0f6a63", pale: "#c9fff8" },
   increaseRange: { accent: "#ff8a3d", deep: "#a8410c", pale: "#ffe0c2" },
+  shield: { accent: "#5aa0ff", deep: "#1d4f9c", pale: "#d6e8ff" },
 };
 
 const OFF: Partial<CSSStyleDeclaration> = { display: "none" };
@@ -51,6 +52,7 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   const scale = cellSizePx / 120;
   const { accent, deep, pale } = PALETTE[type];
   const bomb = type === "extraBomb";
+  const shield = type === "shield";
 
   const mount = document.createElement("div");
   Object.assign(mount.style, {
@@ -189,7 +191,7 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   const barH = document.createElement("div");
   Object.assign(
     barH.style,
-    bomb
+    bomb || shield
       ? OFF
       : box({ left: "24px", top: "52px", width: "72px", height: "16px", borderRadius: "8px", background: pale })
   );
@@ -198,11 +200,43 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   const barV = document.createElement("div");
   Object.assign(
     barV.style,
-    bomb
+    bomb || shield
       ? OFF
       : box({ left: "52px", top: "24px", width: "16px", height: "72px", borderRadius: "8px", background: pale })
   );
   stage.appendChild(barV);
+
+  const shieldIcon = document.createElement("div");
+  Object.assign(
+    shieldIcon.style,
+    shield
+      ? box({
+          left: "28px",
+          top: "26px",
+          width: "64px",
+          height: "68px",
+          background: pale,
+          borderRadius: "14px 14px 50% 50%",
+        })
+      : OFF
+  );
+  stage.appendChild(shieldIcon);
+
+  const shieldInner = document.createElement("div");
+  Object.assign(
+    shieldInner.style,
+    shield
+      ? box({
+          left: "42px",
+          top: "38px",
+          width: "36px",
+          height: "40px",
+          background: deep,
+          borderRadius: "8px 8px 50% 50%",
+        })
+      : OFF
+  );
+  stage.appendChild(shieldInner);
 
   const tip = (x: number, y: number) =>
     box({
@@ -223,14 +257,14 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   ];
   for (const [x, y] of tipPositions) {
     const tipEl = document.createElement("div");
-    Object.assign(tipEl.style, bomb ? OFF : tip(x, y));
+    Object.assign(tipEl.style, bomb || shield ? OFF : tip(x, y));
     stage.appendChild(tipEl);
   }
 
   const core = document.createElement("div");
   Object.assign(
     core.style,
-    bomb
+    bomb || shield
       ? OFF
       : box({ left: "48px", top: "48px", width: "24px", height: "24px", borderRadius: "50%", background: INK, boxShadow: "0 0 12px rgba(0,0,0,.4)" })
   );

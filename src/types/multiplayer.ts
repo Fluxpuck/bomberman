@@ -102,6 +102,9 @@ export interface CharacterSnapshot {
   isImmune: boolean;
   isWalking: boolean;
   isHurt: boolean;
+  hasShield: boolean;
+  isShieldBlock: boolean;
+  isShieldExpiring: boolean;
 }
 
 /** Full authoritative state of the game at one instant, host -> guests. */

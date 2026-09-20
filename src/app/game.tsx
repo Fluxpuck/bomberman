@@ -9,6 +9,8 @@ import { characterManager } from "../game/player";
 // Colors swapped in briefly, in place of a character's own palette, while
 // blinking to signal a hit.
 const HIT_FLASH = { accent: "#e74c3c", dark: "#922b21", light: "#f5b7b1" };
+// Blue blink shown when a shield absorbs a hit — no life was lost.
+const SHIELD_FLASH = { accent: "#5aa0ff", dark: "#1d4f9c", light: "#d6e8ff" };
 
 // Live character wrapper elements keyed by character id. The wrapper owns
 // position; its child is the bomber visual, rebuilt only when the visual
@@ -102,13 +104,27 @@ export default function Game() {
         ? "walk"
         : "idle";
 
-      // Blink red for the whole immunity window after a hit, so it stays
-      // clear the character just lost a life and can't be hit again yet.
-      const blinkOn =
-        char.isImmune() && Math.floor(Date.now() / 100) % 2 === 0;
-      const accent = blinkOn ? HIT_FLASH.accent : char.color;
-      const dark = blinkOn ? HIT_FLASH.dark : char.darkColor;
-      const light = blinkOn ? HIT_FLASH.light : char.lightColor;
+      // Blink for the whole immunity window after a hit, so it stays clear
+      // the character can't be hit again yet. Red when a life was lost,
+      // blue when a shield absorbed the hit instead.
+      const blinkPhase = Math.floor(Date.now() / 100) % 2 === 0;
+      const shieldBlockOn = char.isShowingShieldBlock() && blinkPhase;
+      const blinkOn = char.isImmune() && blinkPhase;
+      const accent = shieldBlockOn
+        ? SHIELD_FLASH.accent
+        : blinkOn
+        ? HIT_FLASH.accent
+        : char.color;
+      const dark = shieldBlockOn
+        ? SHIELD_FLASH.dark
+        : blinkOn
+        ? HIT_FLASH.dark
+        : char.darkColor;
+      const light = shieldBlockOn
+        ? SHIELD_FLASH.light
+        : blinkOn
+        ? HIT_FLASH.light
+        : char.lightColor;
 
       const visualKey = visualKeyFor(
         state,
@@ -149,6 +165,15 @@ export default function Game() {
       // sprite made bombs appear to drop on the wrong tile.
       entry.el.style.left = `${char.position.x * positionScale}px`;
       entry.el.style.top = `${char.position.y * positionScale}px`;
+
+      // Outline shielded characters so the power-up is visible in play.
+      // Blink the ring while the shield is about to expire.
+      const hasShield = char.hasShieldActive();
+      const shieldVisible = hasShield && (!char.isShieldExpiring() || blinkPhase);
+      entry.el.style.boxShadow = shieldVisible
+        ? "0 0 0 3px rgba(90, 160, 255, 0.8)"
+        : "";
+      entry.el.style.borderRadius = hasShield ? "50%" : "";
     });
 
     // Remove elements for characters that died or left the roster

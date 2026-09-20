@@ -122,6 +122,10 @@ class PlayerTracker {
 
   // Inventory management
 
+  grantShield(): void {
+    this._character.grantShield();
+  }
+
   addBomb(): void {
     this._character.addBomb();
   }

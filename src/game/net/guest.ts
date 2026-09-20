@@ -50,12 +50,61 @@ let latestStats: PlayerStats[] = [];
 let latestTimeElapsedMs = 0;
 let latestGameOver: GameOverPayload | null = null;
 
+// Held-key input state sent to the host. Shared by the keyboard listener and
+// the touch-control senders below.
+const guestInput = {
+  up: false,
+  down: false,
+  left: false,
+  right: false,
+  bomb: false,
+};
+
+function sendGuestInput(move?: Direction): void {
+  const sequence = ++nextInputSequence;
+  roomClient.sendToHost({
+    t: "input",
+    sequence,
+    up: guestInput.up,
+    down: guestInput.down,
+    left: guestInput.left,
+    right: guestInput.right,
+    bomb: guestInput.bomb,
+    move,
+  });
+}
+
+/** Queue one movement for the local guest (touch control tap/hold). */
+export function sendGuestMove(direction: Direction): void {
+  if (!active) return;
+  const sequence = nextInputSequence + 1;
+  pendingMoves.push({ sequence, direction });
+  predictMove(direction);
+  sendGuestInput(direction);
+}
+
+/**
+ * Send one bomb press to the host (touch control tap). The flag must return
+ * to false afterwards or the host's edge-triggered placement never re-arms.
+ */
+export function sendGuestBomb(): void {
+  if (!active) return;
+  guestInput.bomb = true;
+  sendGuestInput();
+  window.setTimeout(() => {
+    guestInput.bomb = false;
+    sendGuestInput();
+  }, NET_CONFIG.inputIntervalMs + 30);
+}
+
 // Previous lives per character, used to detect damage for the grunt sound.
 const previousLives: Map<string, number> = new Map();
 // Previous bomb presence per cell index, used for the bomb-drop sound.
 const previousBombByIndex: Map<number, boolean> = new Map();
 // Previous powerup presence per cell index, used for the pickup sound.
 const previousPowerupByIndex: Map<number, boolean> = new Map();
+// Previous shield-block flag per character, used for the shield-break sound.
+const previousShieldBlock: Map<string, boolean> = new Map();
 
 // Keyboard listener cleanup.
 let removeKeyboardListener: (() => void) | null = null;
@@ -80,6 +129,7 @@ export function startGuestView(payload: StartPayload) {
   previousLives.clear();
   previousBombByIndex.clear();
   previousPowerupByIndex.clear();
+  previousShieldBlock.clear();
   nextInputSequence = 0;
   pendingMoves = [];
 
@@ -165,11 +215,21 @@ export function applySnapshot(payload: SnapshotPayload) {
     previousLives.set(snap.id, snap.lives);
     char.lives = snap.lives;
 
+    // Shield break: play the break sound on the rising edge of the flag.
+    const wasShieldBlock = previousShieldBlock.get(snap.id) ?? false;
+    if (snap.isShieldBlock && !wasShieldBlock) {
+      playSound("soundFX", "shield-break", 0.6);
+    }
+    previousShieldBlock.set(snap.id, snap.isShieldBlock);
+
     // Mirror time-based visual flags from the host.
     char.syncTimedFlags({
       isImmune: snap.isImmune,
       isWalking: snap.isWalking,
       isHurt: snap.isHurt,
+      hasShield: snap.hasShield,
+      isShieldBlock: snap.isShieldBlock,
+      isShieldExpiring: snap.isShieldExpiring,
     });
 
     if (snap.id === myPlayerId) {
@@ -278,38 +338,16 @@ export function handleHostPayload(payload: GamePayload) {
 function setupKeyboardInput(): () => void {
   if (typeof window === "undefined") return () => {};
 
-  const input = {
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-    bomb: false,
-  };
-
-  const send = (move?: Direction) => {
-    const sequence = ++nextInputSequence;
-    roomClient.sendToHost({
-      t: "input",
-      sequence,
-      up: input.up,
-      down: input.down,
-      left: input.left,
-      right: input.right,
-      bomb: input.bomb,
-      move,
-    });
-  };
-
   const handleKeyDown = (e: KeyboardEvent) => {
     if (GAME_KEYS.includes(e.key)) {
       e.preventDefault();
     }
     const direction = directionByKey[e.key];
     if (direction !== undefined) {
-      if (direction === Direction.UP) input.up = true;
-      else if (direction === Direction.DOWN) input.down = true;
-      else if (direction === Direction.LEFT) input.left = true;
-      else if (direction === Direction.RIGHT) input.right = true;
+      if (direction === Direction.UP) guestInput.up = true;
+      else if (direction === Direction.DOWN) guestInput.down = true;
+      else if (direction === Direction.LEFT) guestInput.left = true;
+      else if (direction === Direction.RIGHT) guestInput.right = true;
 
       // Browser key-repeat must not create movement faster than physical
       // key presses. Each non-repeat keydown sends one discrete move.
@@ -317,27 +355,27 @@ function setupKeyboardInput(): () => void {
         const sequence = nextInputSequence + 1;
         pendingMoves.push({ sequence, direction });
         predictMove(direction);
-        send(direction);
-      } else send();
+        sendGuestInput(direction);
+      } else sendGuestInput();
     }
     if (e.key === " ") {
-      input.bomb = true;
-      send();
+      guestInput.bomb = true;
+      sendGuestInput();
     }
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
     const direction = directionByKey[e.key];
     if (direction !== undefined) {
-      if (direction === Direction.UP) input.up = false;
-      else if (direction === Direction.DOWN) input.down = false;
-      else if (direction === Direction.LEFT) input.left = false;
-      else if (direction === Direction.RIGHT) input.right = false;
-      send();
+      if (direction === Direction.UP) guestInput.up = false;
+      else if (direction === Direction.DOWN) guestInput.down = false;
+      else if (direction === Direction.LEFT) guestInput.left = false;
+      else if (direction === Direction.RIGHT) guestInput.right = false;
+      sendGuestInput();
     }
     if (e.key === " ") {
-      input.bomb = false;
-      send();
+      guestInput.bomb = false;
+      sendGuestInput();
     }
   };
 
@@ -347,7 +385,7 @@ function setupKeyboardInput(): () => void {
   // Keep held-key state authoritative even if one browser drops a keyboard
   // event during focus changes or backgrounding.
   const inputHeartbeatId = window.setInterval(
-    send,
+    sendGuestInput,
     NET_CONFIG.inputIntervalMs
   );
 
@@ -395,4 +433,5 @@ export function stopGuestView() {
   previousLives.clear();
   previousBombByIndex.clear();
   previousPowerupByIndex.clear();
+  previousShieldBlock.clear();
 }

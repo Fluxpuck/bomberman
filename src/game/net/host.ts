@@ -1,7 +1,4 @@
-import { NET_CONFIG } from "../core/config";
-import { getCellSnapshots, getLayoutCellTypes, grid } from "../grid";
-import { tracker } from "../hooks/tracker";
-import { characterManager } from "../player";
+import { GameState, GridPosition } from "../../types/game";
 import {
   BlastPayload,
   CharacterSnapshot,
@@ -11,8 +8,11 @@ import {
   SnapshotPayload,
   StartPayload,
 } from "../../types/multiplayer";
-import { GameState, GridPosition } from "../../types/game";
+import { NET_CONFIG } from "../core/config";
 import { setOnBombExplode, setRemoteInput } from "../engine";
+import { getCellSnapshots, getLayoutCellTypes, grid } from "../grid";
+import { tracker } from "../hooks/tracker";
+import { characterManager } from "../player";
 import { roomClient } from "./roomClient";
 
 // =========================
@@ -74,6 +74,9 @@ function buildCharacterSnapshots(): CharacterSnapshot[] {
     isImmune: char.isImmune(),
     isWalking: char.isWalking(),
     isHurt: char.isShowingDamageAnimation(),
+    hasShield: char.hasShieldActive(),
+    isShieldBlock: char.isShowingShieldBlock(),
+    isShieldExpiring: char.isShieldExpiring(),
     lastProcessedInputSequence: lastProcessedInputSequence.get(char.id) ?? 0,
   }));
 }

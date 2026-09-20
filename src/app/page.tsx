@@ -5,15 +5,20 @@ import { AudioController } from "../components/AudioController";
 import { EndScreen } from "../components/screens/endScreen";
 import { GameHUD } from "../components/screens/gameHud";
 import { LobbyScreen } from "../components/screens/lobbyScreen";
+import { MapSelectScreen } from "../components/screens/mapSelectScreen";
 import { PauseScreen } from "../components/screens/pauseScreen";
 import { PlayersHUD } from "../components/screens/playerHud";
 import { StartScreen } from "../components/screens/startScreen";
+import { TouchControls } from "../components/touchControls";
 import { GAME_CONFIG } from "../game/core/config";
 import {
   eliminatePlayer,
   getGameState,
+  getLocalPlayerId,
   initializePlayers,
   pauseGame,
+  pressLocalBomb,
+  queuePlayerMove,
   resumeGame,
   setDesiredPlayersCount,
   setOnPlayerDead,
@@ -25,13 +30,17 @@ import {
 } from "../game/engine";
 import { resetGrid } from "../game/grid";
 import { PlayerStats, tracker } from "../game/hooks/tracker";
+import { setMapPattern } from "../game/maps";
 import {
   getLatestGameOver,
   getLatestStats,
   getLatestTimeElapsedMs,
+  getMyPlayerId,
   handleHostPayload,
+  sendGuestBomb,
+  sendGuestMove,
   startGuestView,
-  stopGuestView,
+  stopGuestView
 } from "../game/net/guest";
 import {
   handleGuestPayload,
@@ -41,7 +50,7 @@ import {
   stopHosting,
 } from "../game/net/host";
 import { roomClient } from "../game/net/roomClient";
-import { GameMode, GameState } from "../types/game";
+import { Direction, GameMode, GameState } from "../types/game";
 import { GamePayload, RoomPlayer, RosterEntry } from "../types/multiplayer";
 import Game from "./game";
 
@@ -75,6 +84,11 @@ export default function Home() {
   // The host's roster, kept in a ref so the PLAYING effect and relay handler
   // can read it without re-subscribing.
   const rosterRef = useRef<RosterEntry[]>([]);
+
+  // Pending start params held while the map-select screen is shown. The
+  // online entry carries the host's "fill bots" choice; null = local game.
+  const pendingModeRef = useRef<GameMode>("solo");
+  const pendingOnlineFillBotsRef = useRef<boolean | null>(null);
 
   // =========================
   // Relay dispatch (kept in a ref so the roomClient callback always calls
@@ -167,7 +181,7 @@ export default function Home() {
       roomClient.setOnHostLeft(null);
       roomClient.setOnRelay(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   // =========================
@@ -254,13 +268,20 @@ export default function Home() {
       }
       clearInterval(timeInterval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [gameState, gameMode, isGuest]);
 
   // =========================
   // Start screen handlers (solo/local)
   // =========================
   const handleGameStart = (mode: GameMode) => {
+    pendingModeRef.current = mode;
+    pendingOnlineFillBotsRef.current = null;
+    setGameState(GameState.MAP_SELECT);
+  };
+
+  // Actually launches a solo/local game once a map has been chosen.
+  const startLocalGame = (mode: GameMode) => {
     setIsGuest(false);
     setGameMode(mode);
     setGameState(GameState.PLAYING);
@@ -368,6 +389,12 @@ export default function Home() {
   // Host: start the online game
   // =========================
   const handleStartOnlineGame = (fillBots: boolean) => {
+    pendingOnlineFillBotsRef.current = fillBots;
+    setGameState(GameState.MAP_SELECT);
+  };
+
+  // Actually launches the online game once the host has chosen a map.
+  const startOnlineGame = (fillBots: boolean) => {
     const mySlot = roomClient.getSlot();
     const roster: RosterEntry[] = lobbyState.players.map((p) => ({
       id: `player-${p.slot + 1}`,
@@ -413,6 +440,28 @@ export default function Home() {
   };
 
   // =========================
+  // Map select
+  // =========================
+  const handleMapSelect = (mapId: string) => {
+    setMapPattern(mapId);
+    const fillBots = pendingOnlineFillBotsRef.current;
+    if (fillBots !== null) {
+      startOnlineGame(fillBots);
+    } else {
+      startLocalGame(pendingModeRef.current);
+    }
+  };
+
+  const handleMapSelectBack = () => {
+    if (pendingOnlineFillBotsRef.current !== null) {
+      pendingOnlineFillBotsRef.current = null;
+      setGameState(GameState.LOBBY);
+    } else {
+      setGameState(GameState.START);
+    }
+  };
+
+  // =========================
   // Restart / return to menu
   // =========================
   const handleGameRestart = () => {
@@ -444,8 +493,9 @@ export default function Home() {
       return;
     }
 
-    // Solo/local: reuse the existing flow.
-    handleGameStart(gameMode);
+    // Solo/local: restart straight away with the same map selection — a
+    // "random" pick re-rolls on this reset.
+    startLocalGame(gameMode);
   };
 
   // =========================
@@ -456,6 +506,22 @@ export default function Home() {
       return getLatestStats();
     }
     return tracker.getPlayers().map((player) => player.getStats());
+  };
+
+  // The end screen only shows the local player's own stats.
+  const getOwnStats = (): PlayerStats[] => {
+    const all = getPlayerStats();
+    if (gameMode === "online" && isGuest) {
+      const myId = getMyPlayerId();
+      return all.filter((player) => player.id === myId);
+    }
+    if (gameMode === "online") {
+      const myId = rosterRef.current.find(
+        (entry) => entry.control === "local"
+      )?.id;
+      return all.filter((player) => player.id === myId);
+    }
+    return all.filter((player) => player.isPlayer);
   };
 
   // =========================
@@ -478,6 +544,26 @@ export default function Home() {
   // Whether to show the "Play Again" button (host or solo/local only).
   const canPlayAgain = !(gameMode === "online" && isGuest);
 
+  // =========================
+  // Touch controls
+  // =========================
+  const handleTouchMove = (direction: Direction) => {
+    if (gameMode === "online" && isGuest) {
+      sendGuestMove(direction);
+      return;
+    }
+    const playerId = getLocalPlayerId();
+    if (playerId) queuePlayerMove(playerId, direction);
+  };
+
+  const handleTouchBomb = () => {
+    if (gameMode === "online" && isGuest) {
+      sendGuestBomb();
+      return;
+    }
+    pressLocalBomb();
+  };
+
   return (
     <main className="min-h-screen flex items-center justify-center relative bg-gray-900 text-white overflow-hidden">
       {/* Background */}
@@ -489,8 +575,9 @@ export default function Home() {
       {/* Audio Controller - Always visible */}
       <AudioController autoPlay={true} />
 
-      {/* Game Content */}
-      <div className="relative z-10 w-full h-full flex items-center justify-center">
+      {/* Game Content (padding reserves room for the HUD strip and touch
+          controls in portrait orientation) */}
+      <div className="relative z-10 w-full h-full flex items-center justify-center portrait:pt-28 portrait:pb-64">
         {/* Game HUD - Show during gameplay and when paused */}
         {(gameState === GameState.PLAYING ||
           gameState === GameState.PAUSED) && (
@@ -507,9 +594,22 @@ export default function Home() {
         {(gameState === GameState.PLAYING ||
           gameState === GameState.PAUSED) && <Game />}
 
+        {/* Touch Controls - only rendered on touch-capable devices */}
+        {gameState === GameState.PLAYING && (
+          <TouchControls onMove={handleTouchMove} onBomb={handleTouchBomb} />
+        )}
+
         {/* Start Screen */}
         {gameState === GameState.START && (
           <StartScreen onStart={handleGameStart} onMultiplayer={handleMultiplayer} />
+        )}
+
+        {/* Map Select Screen */}
+        {gameState === GameState.MAP_SELECT && (
+          <MapSelectScreen
+            onSelect={handleMapSelect}
+            onBack={handleMapSelectBack}
+          />
         )}
 
         {/* Lobby Screen */}
@@ -545,7 +645,7 @@ export default function Home() {
           <EndScreen
             gameState={gameState}
             winner={getEndWinner()}
-            players={getPlayerStats()}
+            players={getOwnStats()}
             timeLeft={GAME_CONFIG.timeLimit * 1000 - timeElapsedMs}
             gameStats={getEndGameStats()}
             onReturnToMenu={handleGameRestart}

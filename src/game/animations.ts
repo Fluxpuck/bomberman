@@ -1,14 +1,14 @@
 import type { GridPosition } from "../types/game";
 import {
-  BlastReach,
-  createBlastVisual,
-  createBombVisual,
+    BlastReach,
+    createBlastVisual,
+    createBombVisual,
 } from "./assets/dynamite";
 import { createPowerUp, PowerupType } from "./assets/powerups";
 import {
-  BOMB_CONFIG,
-  GRID_PATTERN,
-  POWERUP_CONFIG
+    BOMB_CONFIG,
+    GRID_PATTERN,
+    POWERUP_CONFIG
 } from "./core/config";
 import { playSound } from "./hooks/sound";
 import { tracker } from "./hooks/tracker";
@@ -243,17 +243,17 @@ export function armDynamite(
   const here = getCellFlags(grid, at.row, at.col);
   if (here.solid && !here.barrel) return;
 
-  // Create the dynamite element
+  // Get the fuse duration
+  const fuse = Math.max(0, opts?.fuseMs ?? BOMB_CONFIG.fuseDuration);
+
+  // Create the dynamite element (fuse visual burns down over the fuse time)
   const cellSizePx = cell.offsetWidth || GRID_PATTERN.cellSize;
-  const dyn = createBombVisual(cellSizePx);
+  const dyn = createBombVisual(cellSizePx, fuse);
   cell.appendChild(dyn);
 
   // Mark as bomb and make the cell solid so it can't be walked through
   (cell.dataset as any).bomb = "1";
   cell.dataset.solid = "1";
-
-  // Get the fuse duration
-  const fuse = Math.max(0, opts?.fuseMs ?? BOMB_CONFIG.fuseDuration);
 
   // Generate a unique ID for this bomb based on its position
   const bombId = `bomb-${at.row}-${at.col}`;
@@ -423,6 +423,16 @@ function detonateBomb(bombId: string): void {
       }
     }
 
+    // Power-ups caught in the blast are destroyed
+    if (isPowerup) {
+      for (const child of Array.from(target.children)) {
+        const element = child as HTMLElement;
+        if (element.dataset.powerup !== undefined) {
+          target.removeChild(element);
+        }
+      }
+    }
+
     // Handle barrels
     if ((target.dataset as any).barrel === "1") {
       if (target.firstElementChild) {
@@ -447,7 +457,11 @@ function detonateBomb(bombId: string): void {
         Math.min(1, POWERUP_CONFIG.dropChance ?? 0)
       );
       if (Math.random() < dropChance) {
-        const types = ["extraBomb", "increaseRange"] as PowerupType[];
+        const types = [
+          "extraBomb",
+          "increaseRange",
+          "shield",
+        ] as PowerupType[];
         const t = types[Math.floor(Math.random() * types.length)];
         const cellSizePx = target.offsetWidth || GRID_PATTERN.cellSize;
         const pu = createPowerUp(t, cellSizePx);

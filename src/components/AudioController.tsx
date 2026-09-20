@@ -21,7 +21,7 @@ export function AudioController({ autoPlay = true }: AudioControllerProps) {
   };
 
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-70 rounded-full px-4 py-2 flex items-center space-x-3 z-50">
+    <div className="fixed top-2 sm:top-auto sm:bottom-4 left-1/2 transform -translate-x-1/2 portrait:top-auto portrait:bottom-2 portrait:left-auto portrait:right-2 portrait:-translate-x-0 bg-gray-800 bg-opacity-70 rounded-full px-4 py-2 flex items-center space-x-3 z-50">
       <button
         onClick={toggleMute}
         className="text-white hover:text-gray-300 focus:outline-none"
@@ -40,10 +40,10 @@ export function AudioController({ autoPlay = true }: AudioControllerProps) {
         step="0.01"
         value={volume}
         onChange={handleVolumeChange}
-        className="w-24 accent-blue-500"
+        className="hidden sm:block w-24 accent-blue-500"
       />
 
-      <span className="text-white text-xs">{Math.round(volume * 100)}%</span>
+      <span className="hidden sm:block text-white text-xs">{Math.round(volume * 100)}%</span>
     </div>
   );
 }

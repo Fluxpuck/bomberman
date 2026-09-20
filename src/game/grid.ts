@@ -3,7 +3,8 @@ import { CellSnapshot } from "../types/multiplayer";
 import { createTileVisual, rescaleTileVisual, TileKind } from "./assets/blocks";
 import { createBombVisual } from "./assets/dynamite";
 import { createPowerUp, PowerupType, rescalePowerUpVisual } from "./assets/powerups";
-import { GRID_PATTERN } from "./core/config";
+import { GRID_PATTERN, LAYOUT_CONFIG } from "./core/config";
+import { getActiveMapPattern, isInSpawnZone, MapPattern } from "./maps";
 
 // =========================
 // Types
@@ -46,7 +47,7 @@ function cellTypeToTileKind(type: CellType): TileKind {
 // =========================
 // Constants
 // =========================
-const { gridRows, gridCols, cellSize, cornerSafeSize } = GRID_PATTERN;
+const { gridRows, gridCols, cellSize } = GRID_PATTERN;
 
 // =========================
 // Grid Analysis Functions
@@ -60,50 +61,20 @@ function isBorderCell(row: number, col: number): boolean {
 }
 
 /**
- * Check if a position should have a solid block (checkerboard pattern)
+ * Determine if a breakable block should be placed (random based on the
+ * active map pattern's coverage)
  */
-function isSolidPatternCell(row: number, col: number): boolean {
-  const { rowOffset = 0, colOffset = 0 } = GRID_PATTERN;
-  const rParity = (row + rowOffset) % 2;
-  const cParity = (col + colOffset) % 2;
-  return rParity === 1 && cParity === 1;
-}
-
-/**
- * Check if a position is in a corner spawn-safe zone
- */
-function isInSpawnZone(row: number, col: number): boolean {
-  const size = Math.max(0, Math.floor(cornerSafeSize ?? 0));
-  if (size <= 0) return false;
-
-  const minRow = 1;
-  const minCol = 1;
-  const maxRow = gridRows - 2;
-  const maxCol = gridCols - 2;
-
-  const inTopRows = row >= minRow && row < minRow + size;
-  const inBottomRows = row > maxRow - size && row <= maxRow;
-  const inLeftCols = col >= minCol && col < minCol + size;
-  const inRightCols = col > maxCol - size && col <= maxCol;
-
-  return (
-    (inTopRows && inLeftCols) ||
-    (inTopRows && inRightCols) ||
-    (inBottomRows && inLeftCols) ||
-    (inBottomRows && inRightCols)
-  );
-}
-
-/**
- * Determine if a breakable block should be placed (random based on coverage)
- */
-function shouldPlaceBreakable(row: number, col: number): boolean {
+function shouldPlaceBreakable(
+  row: number,
+  col: number,
+  pattern: MapPattern
+): boolean {
   // Don't place breakables on borders, solid blocks, or spawn zones
   if (isBorderCell(row, col)) return false;
-  if (isSolidPatternCell(row, col)) return false;
+  if (pattern.isPillar(row, col)) return false;
   if (isInSpawnZone(row, col)) return false;
 
-  const coverage = Math.max(0, Math.min(1, GRID_PATTERN.coverage ?? 0));
+  const coverage = Math.max(0, Math.min(1, pattern.coverage ?? 0));
   return Math.random() < coverage;
 }
 
@@ -124,6 +95,7 @@ function pickBreakableType(): "crate" | "barrel" {
 function generateGridLayout(): GridLayout {
   const cells: CellData[] = [];
   const totalCells = gridRows * gridCols;
+  const pattern = getActiveMapPattern();
 
   for (let i = 0; i < totalCells; i++) {
     const row = Math.floor(i / gridCols);
@@ -133,9 +105,9 @@ function generateGridLayout(): GridLayout {
 
     if (isBorderCell(row, col)) {
       type = "border";
-    } else if (isSolidPatternCell(row, col)) {
+    } else if (pattern.isPillar(row, col)) {
       type = "solid";
-    } else if (shouldPlaceBreakable(row, col)) {
+    } else if (shouldPlaceBreakable(row, col, pattern)) {
       type = pickBreakableType();
     }
 
@@ -366,8 +338,17 @@ export function updateGridLayout(
 ): void {
   if (typeof document === "undefined") return;
 
+  // In portrait the player HUDs and touch controls take vertical space, so
+  // the grid must shrink to fit between them.
+  const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+  const reservedHeight = isPortrait
+    ? LAYOUT_CONFIG.portraitTopChrome + LAYOUT_CONFIG.portraitBottomChrome
+    : 0;
+
   const maxCellW = Math.floor((viewWidth - padding * 2) / gridCols);
-  const maxCellH = Math.floor((viewHeight - padding * 2) / gridRows);
+  const maxCellH = Math.floor(
+    (viewHeight - padding * 2 - reservedHeight) / gridRows
+  );
   const cell = Math.max(8, Math.min(cellSize, maxCellW, maxCellH));
 
   grid.style.gridTemplateColumns = `repeat(${gridCols}, ${cell}px)`;
@@ -519,5 +500,5 @@ export function applyCellSnapshots(cells: CellSnapshot[]): void {
   }
 }
 
-export { cellSize, grid, gridCols, gridRows };
+export { cellSize, grid, gridCols, gridRows, isInSpawnZone };
 

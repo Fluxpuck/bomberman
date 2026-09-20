@@ -111,6 +111,21 @@ export function queuePlayerMove(playerId: string, direction: Direction): void {
   input.moveQueue.push(direction);
 }
 
+/** The id of the locally controlled player (null before the roster is set). */
+export function getLocalPlayerId(): string | null {
+  return localPlayerId;
+}
+
+/**
+ * Place a bomb for the local player immediately. Used by touch controls;
+ * the cooldown and bomb-limit checks inside placeBomb still apply.
+ */
+export function pressLocalBomb(): void {
+  if (!localPlayerId) return;
+  const character = characterManager.get(localPlayerId);
+  if (character) placeBomb(character);
+}
+
 const lastBombTimeByPlayer: Record<string, number> = {};
 
 // =========================
@@ -425,8 +440,14 @@ function checkBlastCellDamage(character: Character): void {
       if (playerTracker) {
         blastCell.hitCharacterIds.add(character.id);
 
-        // Apply one hit and start the immunity window.
-        playerTracker.decrementLife();
+        // Apply one hit and start the immunity window. An active shield
+        // absorbs the hit, so no life is lost.
+        const absorbedByShield = character.consumeShield();
+        if (absorbedByShield) {
+          playSound("soundFX", "shield-break", 0.6);
+        } else {
+          playerTracker.decrementLife();
+        }
         character.setImmune();
 
         // If this killed the player and it wasn't self-damage, credit the kill
