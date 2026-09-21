@@ -461,6 +461,7 @@ function detonateBomb(bombId: string): void {
           "extraBomb",
           "increaseRange",
           "shield",
+          "teleport",
         ] as PowerupType[];
         const t = types[Math.floor(Math.random() * types.length)];
         const cellSizePx = target.offsetWidth || GRID_PATTERN.cellSize;

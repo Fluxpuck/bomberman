@@ -1,5 +1,5 @@
 // Types of powerups
-export type PowerupType = "extraBomb" | "increaseRange" | "shield";
+export type PowerupType = "extraBomb" | "increaseRange" | "shield" | "teleport";
 
 const INK = "#0d1626";
 
@@ -7,6 +7,7 @@ const PALETTE: Record<PowerupType, { accent: string; deep: string; pale: string 
   extraBomb: { accent: "#38d6c4", deep: "#0f6a63", pale: "#c9fff8" },
   increaseRange: { accent: "#ff8a3d", deep: "#a8410c", pale: "#ffe0c2" },
   shield: { accent: "#5aa0ff", deep: "#1d4f9c", pale: "#d6e8ff" },
+  teleport: { accent: "#c16bff", deep: "#6a2c9c", pale: "#f0d7ff" },
 };
 
 const OFF: Partial<CSSStyleDeclaration> = { display: "none" };
@@ -53,6 +54,7 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   const { accent, deep, pale } = PALETTE[type];
   const bomb = type === "extraBomb";
   const shield = type === "shield";
+  const teleport = type === "teleport";
 
   const mount = document.createElement("div");
   Object.assign(mount.style, {
@@ -191,7 +193,7 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   const barH = document.createElement("div");
   Object.assign(
     barH.style,
-    bomb || shield
+    bomb || shield || teleport
       ? OFF
       : box({ left: "24px", top: "52px", width: "72px", height: "16px", borderRadius: "8px", background: pale })
   );
@@ -200,7 +202,7 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   const barV = document.createElement("div");
   Object.assign(
     barV.style,
-    bomb || shield
+    bomb || shield || teleport
       ? OFF
       : box({ left: "52px", top: "24px", width: "16px", height: "72px", borderRadius: "8px", background: pale })
   );
@@ -238,6 +240,41 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   );
   stage.appendChild(shieldInner);
 
+  const teleportIcon = document.createElement("div");
+  Object.assign(
+    teleportIcon.style,
+    teleport
+      ? box({
+          left: "28px",
+          top: "28px",
+          width: "64px",
+          height: "64px",
+          border: `6px dashed ${pale}`,
+          borderRadius: "50%",
+          boxShadow: `0 0 0 5px ${deep}`,
+          transform: "rotate(22deg)",
+        })
+      : OFF
+  );
+  stage.appendChild(teleportIcon);
+
+  const teleportCore = document.createElement("div");
+  Object.assign(
+    teleportCore.style,
+    teleport
+      ? box({
+          left: "48px",
+          top: "48px",
+          width: "24px",
+          height: "24px",
+          borderRadius: "50%",
+          background: INK,
+          boxShadow: `0 0 0 5px ${pale}`,
+        })
+      : OFF
+  );
+  stage.appendChild(teleportCore);
+
   const tip = (x: number, y: number) =>
     box({
       left: `${x}px`,
@@ -257,14 +294,14 @@ export function createPowerUp(type: PowerupType, cellSizePx: number): HTMLDivEle
   ];
   for (const [x, y] of tipPositions) {
     const tipEl = document.createElement("div");
-    Object.assign(tipEl.style, bomb || shield ? OFF : tip(x, y));
+    Object.assign(tipEl.style, bomb || shield || teleport ? OFF : tip(x, y));
     stage.appendChild(tipEl);
   }
 
   const core = document.createElement("div");
   Object.assign(
     core.style,
-    bomb || shield
+    bomb || shield || teleport
       ? OFF
       : box({ left: "48px", top: "48px", width: "24px", height: "24px", borderRadius: "50%", background: INK, boxShadow: "0 0 12px rgba(0,0,0,.4)" })
   );
