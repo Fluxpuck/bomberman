@@ -10,6 +10,12 @@ import { PauseScreen } from "../components/screens/pauseScreen";
 import { PlayersHUD } from "../components/screens/playerHud";
 import { StartScreen } from "../components/screens/startScreen";
 import { TouchControls } from "../components/touchControls";
+import {
+  getLaunchRoomCode,
+  initDiscordClient,
+  isDiscordActivity,
+} from "../discord/client";
+import { updatePresence } from "../discord/presence";
 import { GAME_CONFIG } from "../game/core/config";
 import {
   eliminatePlayer,
@@ -89,6 +95,14 @@ export default function Home() {
   // online entry carries the host's "fill bots" choice; null = local game.
   const pendingModeRef = useRef<GameMode>("solo");
   const pendingOnlineFillBotsRef = useRef<boolean | null>(null);
+
+  // Discord Activity state: the room code carried by a shareLink invite
+  // (pre-fills the lobby join box), and whether the SDK has authenticated —
+  // gating the presence effect so the first push doesn't fire before auth.
+  const [inviteJoinCode, setInviteJoinCode] = useState("");
+  const [discordReady, setDiscordReady] = useState(false);
+  // Wall-clock match start for the presence elapsed timer.
+  const matchStartMsRef = useRef(0);
 
   // =========================
   // Relay dispatch (kept in a ref so the roomClient callback always calls
@@ -185,6 +199,22 @@ export default function Home() {
   }, []);
 
   // =========================
+  // Discord Activity init + invite deep-link
+  // =========================
+  useEffect(() => {
+    if (!isDiscordActivity()) return;
+    initDiscordClient().then((sdk) => {
+      if (!sdk) return;
+      setDiscordReady(true);
+      const code = getLaunchRoomCode();
+      if (code) {
+        setInviteJoinCode(code);
+        setGameState(GameState.LOBBY);
+      }
+    });
+  }, []);
+
+  // =========================
   // Escape key (pause) — disabled in online games
   // =========================
   useEffect(() => {
@@ -210,6 +240,7 @@ export default function Home() {
   // =========================
   useEffect(() => {
     if (gameState !== GameState.PLAYING) return;
+    matchStartMsRef.current = Date.now();
 
     if (gameMode === "online" && isGuest) {
       // Guest: no engine to start. The guest view was already started by the
@@ -270,6 +301,30 @@ export default function Home() {
     };
      
   }, [gameState, gameMode, isGuest]);
+
+  // =========================
+  // Discord rich presence — no-op outside Discord. Declared after the
+  // PLAYING effect so matchStartMsRef is already set on match entry.
+  // =========================
+  useEffect(() => {
+    if (!discordReady) return;
+    const inMatch =
+      gameState === GameState.PLAYING || gameState === GameState.PAUSED;
+    updatePresence(gameState, {
+      gameMode,
+      roomCode: lobbyState.code,
+      playerCount: lobbyState.players.length,
+      matchStartMs: inMatch ? matchStartMsRef.current : 0,
+      winnerName: winner?.name,
+    });
+  }, [
+    gameState,
+    gameMode,
+    lobbyState.code,
+    lobbyState.players.length,
+    winner,
+    discordReady,
+  ]);
 
   // =========================
   // Start screen handlers (solo/local)
@@ -621,6 +676,7 @@ export default function Home() {
             myName={lobbyState.myName}
             error={lobbyState.error}
             connecting={lobbyState.connecting}
+            initialJoinCode={inviteJoinCode}
             onCreate={handleCreateRoom}
             onJoin={handleJoinRoom}
             onLeave={handleLeaveRoom}

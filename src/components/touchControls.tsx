@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Direction } from "../types/game";
+import { Bomb } from "./sprites";
 
 interface TouchControlsProps {
   onMove: (direction: Direction) => void;
@@ -16,8 +17,7 @@ const isTouchDevice = (): boolean => {
   return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };
 
-const padButton =
-  "w-12 h-12 rounded-lg bg-gray-700/70 active:bg-gray-500/70 text-white text-xl font-bold flex items-center justify-center select-none touch-none";
+const padButton = "ui-pad select-none touch-none";
 
 /**
  * On-screen d-pad + bomb button for touch devices. Each tap queues one move
@@ -82,14 +82,21 @@ export function TouchControls({ onMove, onBomb }: TouchControlsProps) {
         {/* Bomb button */}
         <button
           type="button"
-          className="w-16 h-16 rounded-full bg-gray-700/70 active:bg-gray-500/70 text-white text-2xl font-bold flex items-center justify-center select-none touch-none pointer-events-auto"
+          aria-label="Place bomb"
+          className="w-[72px] h-[72px] rounded-full flex items-center justify-center select-none touch-none pointer-events-auto border-[3px] border-[#a8410c] active:scale-95 transition-transform"
+          style={{
+            background: "linear-gradient(160deg,#ffce3d 0%,#ff9a2b 100%)",
+            boxShadow: "0 5px 0 #a8410c, 0 10px 18px rgba(0,0,0,.45), inset 0 3px 0 rgba(255,255,255,.35)",
+          }}
           onPointerDown={(e) => {
             e.preventDefault();
             onBomb();
           }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          💣
+          <span className="pointer-events-none -translate-y-0.5">
+            <Bomb state="placed" scale={0.5} />
+          </span>
         </button>
       </div>
     </div>

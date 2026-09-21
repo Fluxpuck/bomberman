@@ -1,5 +1,5 @@
 // =========================
-// Bomberman multiplayer relay server
+// Bomb Blast Arena multiplayer relay server
 // =========================
 // Game-agnostic WebSocket relay. Knows only about rooms, 4-letter codes,
 // up to 4 slots per room, and forwarding messages between host and guests.
@@ -225,4 +225,4 @@ setInterval(() => {
   }
 }, HEARTBEAT_INTERVAL_MS);
 
-console.log(`Bomberman relay server listening on ws://localhost:${WS_PORT}`);
+console.log(`Bomb Blast Arena relay server listening on ws://localhost:${WS_PORT}`);

@@ -22,7 +22,7 @@ function ensureKeyframes(): void {
 }
 
 /**
- * Creates a Bomberman-style character element, scaled from the source 120px
+ * Creates a Bomb Blast Arena-style character element, scaled from the source 120px
  * design box down to the live cell size.
  */
 export function createBomberVisual(

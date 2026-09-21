@@ -1,6 +1,6 @@
-# Bomberman 💣
+# Bomb Blast Arena 💣
 
-A fun project and modern take on a classic Bomberman game with NPC opponents and online multiplayer.
+A fun project and modern take on a classic grid-based bomber game with NPC opponents and online multiplayer.
 
 ## Quick Start
 

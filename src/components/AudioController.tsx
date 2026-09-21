@@ -21,16 +21,14 @@ export function AudioController({ autoPlay = true }: AudioControllerProps) {
   };
 
   return (
-    <div className="fixed top-2 sm:top-auto sm:bottom-4 left-1/2 transform -translate-x-1/2 portrait:top-auto portrait:bottom-2 portrait:left-auto portrait:right-2 portrait:-translate-x-0 bg-gray-800 bg-opacity-70 rounded-full px-4 py-2 flex items-center space-x-3 z-50">
+    <div className="ui-panel ui-panel--glass fixed top-2 sm:top-auto sm:bottom-4 left-1/2 transform -translate-x-1/2 portrait:top-auto portrait:bottom-2 portrait:left-auto portrait:right-2 portrait:-translate-x-0 !rounded-full !px-4 !py-2 flex items-center gap-3 z-50">
       <button
+        type="button"
         onClick={toggleMute}
-        className="text-white hover:text-gray-300 focus:outline-none"
+        aria-label={isMuted ? "Unmute music" : "Mute music"}
+        className="text-xl rounded-full transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-4"
       >
-        {isMuted ? (
-          <span className="text-xl">🔇</span>
-        ) : (
-          <span className="text-xl">🔊</span>
-        )}
+        {isMuted ? "🔇" : "🔊"}
       </button>
 
       <input
@@ -40,10 +38,13 @@ export function AudioController({ autoPlay = true }: AudioControllerProps) {
         step="0.01"
         value={volume}
         onChange={handleVolumeChange}
-        className="hidden sm:block w-24 accent-blue-500"
+        aria-label="Music volume"
+        className="ui-range hidden sm:block w-24"
       />
 
-      <span className="hidden sm:block text-white text-xs">{Math.round(volume * 100)}%</span>
+      <span className="hidden sm:block ui-label !tracking-normal w-9 text-right">
+        {Math.round(volume * 100)}%
+      </span>
     </div>
   );
 }

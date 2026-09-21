@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Local storage keys
-const VOLUME_STORAGE_KEY = "bomberman-volume";
-const MUTE_STORAGE_KEY = "bomberman-muted";
+const VOLUME_STORAGE_KEY = "bomb-blast-arena-volume";
+const MUTE_STORAGE_KEY = "bomb-blast-arena-muted";
 
 interface UseAudioOptions {
   audioSrc: string;

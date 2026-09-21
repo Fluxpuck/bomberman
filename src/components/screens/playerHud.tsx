@@ -34,9 +34,10 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
 
   return (
     <div
-      className={`fixed portrait:static bg-gray-900/80 border-2 rounded-lg overflow-hidden z-40 w-32 sm:w-48 portrait:w-full ${getPositionClasses()}`}
+      className={`ui-panel ui-panel--glass fixed portrait:static overflow-hidden z-40 w-32 sm:w-48 portrait:w-full !p-0 ${getPositionClasses()}`}
       style={{
         borderColor: player.color,
+        opacity: isAlive ? 1 : 0.75,
       }}
     >
       {/* Header bar with player color */}
@@ -46,16 +47,11 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
       <div className="p-2 sm:p-3 portrait:p-2">
         {/* Player name */}
         <div className="flex justify-between items-center sm:mb-2 portrait:mb-0">
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: player.color }}
-            />
-            <span className="font- text-white">
-              {displayName}
-            </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="ui-dot !w-3 !h-3" style={{ backgroundColor: player.color }} />
+            <span className="font-bold text-sm truncate">{displayName}</span>
             {player.latencyMs !== null && (
-              <span className="text-[10px] text-gray-400">
+              <span className="ui-label !text-[10px] !tracking-normal">
                 {player.latencyMs} ms
               </span>
             )}
@@ -65,54 +61,47 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
         {/* Player stats (hidden on small screens and in portrait to keep
             HUDs compact) */}
         {isAlive ? (
-          <div className="hidden sm:block portrait:hidden space-y-1 text-sm">
-            {/* Score */}
-            <div className="flex justify-between">
-              <span className="text-gray-400">Score</span>
-              <span className="font-extrabold text-white">{player.score}</span>
+          <div className="hidden sm:block portrait:hidden">
+            <div className="ui-row !py-0.5">
+              <span>Score</span>
+              <span>{player.score}</span>
             </div>
 
-            {/* Lives */}
-            <div className="flex justify-between">
-              <span className="text-gray-400">Lives</span>
-              <div className="flex gap-1">
+            <div className="ui-row !py-0.5">
+              <span>Lives</span>
+              <span className="flex gap-0.5 !font-sans !text-red-500">
                 {[...Array(player.lives)].map((_, i) => (
-                  <div key={i} className="w-3 h-3 rounded-full bg-red-500" />
+                  <span key={i} aria-hidden>
+                    ♥
+                  </span>
                 ))}
-              </div>
+              </span>
             </div>
 
-            {/* Bombs */}
-            <div className="flex justify-between">
-              <span className="text-gray-400">Bombs</span>
-              <div className="flex items-center gap-1">
-                <span className="font-medium text-white">
-                  {player.bombsAvailable - (player.activeBombs || 0)}
-                </span>
-                <span className="text-xs text-gray-400">
-                  / {player.bombsAvailable}
-                </span>
-              </div>
+            <div className="ui-row !py-0.5">
+              <span>Bombs</span>
+              <span>
+                {player.bombsAvailable - (player.activeBombs || 0)}
+                <span className="!text-[var(--ui-muted)]"> / {player.bombsAvailable}</span>
+              </span>
             </div>
 
-            {/* Range */}
-            <div className="flex justify-between">
-              <span className="text-gray-400">Range</span>
-              <span className="font-medium text-white">{player.bombRange}</span>
+            <div className="ui-row !py-0.5">
+              <span>Range</span>
+              <span>{player.bombRange}</span>
             </div>
 
-            {/* Kills (if any) */}
             {player.kills > 0 && (
-              <div className="flex justify-between">
-                <span className="text-gray-400">Kills</span>
-                <span className="font-medium text-white">{player.kills}</span>
+              <div className="ui-row !py-0.5">
+                <span>Kills</span>
+                <span>{player.kills}</span>
               </div>
             )}
           </div>
         ) : (
           <div className="text-center py-1">
-            <span className="text-red-500 font-bold tracking-wider">
-              ELIMINATED
+            <span className="ui-label !text-[var(--ui-danger)] !tracking-[0.2em]">
+              Eliminated
             </span>
           </div>
         )}

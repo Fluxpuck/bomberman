@@ -72,6 +72,40 @@ export function getServerUrl(): string {
   return NET_CONFIG.defaultServerUrl;
 }
 
+// =========================
+// Discord Activity (rich presence)
+// =========================
+// Only active when the game runs inside Discord's Activity iframe — see
+// src/discord/. The client ID is public (NEXT_PUBLIC_*); the client secret
+// stays server-side in the /api/token route.
+export const DISCORD_CONFIG = {
+  // OAuth scopes requested from the Discord client. rpc.activities.write
+  // unlocks setActivity(); identify is required for authenticate().
+  oauthScopes: ["identify", "rpc.activities.write"],
+  // URL-mapping prefix configured in the dev portal that proxies to the
+  // relay server. patchUrlMappings rewrites relay WebSocket connections to
+  // /.proxy<wsProxyPrefix> when running inside Discord.
+  wsProxyPrefix: "/ws",
+  // Presence art served from public/ as an external URL (portal-uploaded
+  // asset keys would also work, but external URLs need no portal setup).
+  largeImagePath: "/image/background.jpg",
+  largeImageText: "lo-fi bomb blast arena",
+  // Prefix for the shareLink custom_id used to deep-link invites to a room.
+  roomCodePrefix: "room:",
+  shareMessage: "Come play Bomb Blast Arena with me!",
+  maxPartySize: 4,
+};
+
+export function getDiscordClientId(): string {
+  if (
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID
+  ) {
+    return process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
+  }
+  return "";
+}
+
 export const CHARACTER_CONFIG = {
   // How long a character keeps playing the "walk" sprite animation after a
   // move (isWalking window). There is no position transition — sprites snap

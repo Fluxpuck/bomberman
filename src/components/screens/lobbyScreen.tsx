@@ -1,8 +1,13 @@
 import { useState } from "react";
+import { getDiscordSdk, isDiscordActivity } from "../../discord/client";
+import { DISCORD_CONFIG } from "../../game/core/config";
 import { RoomPlayer } from "../../types/multiplayer";
+import { Button, Heading, LinkButton, Panel, Screen } from "../ui";
 
 interface LobbyScreenProps {
   roomCode: string | null;
+  /** Pre-fills the join box — set when launched from a Discord invite. */
+  initialJoinCode?: string;
   players: RoomPlayer[];
   isHost: boolean;
   myName: string;
@@ -15,8 +20,12 @@ interface LobbyScreenProps {
   onBack: () => void;
 }
 
+// Slot colours match the in-game player colours.
+const SLOT_COLORS = ["#60a5fa", "#ef4444", "#4ade80", "#a78bfa"];
+
 export function LobbyScreen({
   roomCode,
+  initialJoinCode = "",
   players,
   isHost,
   myName,
@@ -29,7 +38,7 @@ export function LobbyScreen({
   onBack,
 }: LobbyScreenProps) {
   const [name, setName] = useState(myName);
-  const [joinCode, setJoinCode] = useState("");
+  const [joinCode, setJoinCode] = useState(initialJoinCode);
   const [fillBots, setFillBots] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -48,107 +57,130 @@ export function LobbyScreen({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 w-[420px] max-w-full shadow-2xl">
-        {/* Title */}
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-white mb-1">Multiplayer</h1>
-          <p className="text-gray-400 text-sm">
-            {inRoom ? "Room lobby" : "Create or join a room"}
-          </p>
-        </div>
+  const handleShareInvite = async () => {
+    const sdk = getDiscordSdk();
+    if (!sdk || !roomCode) return;
+    try {
+      await sdk.commands.shareLink({
+        message: DISCORD_CONFIG.shareMessage,
+        custom_id: `${DISCORD_CONFIG.roomCodePrefix}${roomCode}`,
+      });
+    } catch {
+      // Invite sharing is best-effort.
+    }
+  };
 
-        {/* Name input (only before joining a room) */}
-        {!inRoom && (
-          <div className="mb-4">
-            <label className="block text-sm text-gray-400 mb-1">
-              Your nickname
-            </label>
-            <input
-              type="text"
-              value={name}
-              maxLength={16}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter a nickname"
-              className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-gray-500"
-            />
-          </div>
-        )}
+  return (
+    <Screen>
+      <Panel width={440}>
+        <Heading
+          title="MULTIPLAYER"
+          subtitle={inRoom ? "Room lobby" : "Create or join a room"}
+          tone="cyan"
+        />
 
         {/* Create / Join (only before entering a room) */}
         {!inRoom && (
-          <>
-            <button
+          <div className="flex flex-col gap-4">
+            <div>
+              <label htmlFor="nickname" className="ui-label block mb-2">
+                Your nickname
+              </label>
+              <input
+                id="nickname"
+                type="text"
+                value={name}
+                maxLength={16}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter a nickname"
+                className="ui-input"
+              />
+            </div>
+
+            <Button
+              block
+              variant="purple"
+              size="lg"
               disabled={!name.trim() || connecting}
               onClick={() => onCreate(name.trim())}
-              className="w-full py-3 mb-3 rounded-lg font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {connecting ? "Connecting…" : "Create Room"}
-            </button>
+            </Button>
 
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <span className="flex-1 h-px bg-[var(--ui-line)]" />
+              <span className="ui-label">or join</span>
+              <span className="flex-1 h-px bg-[var(--ui-line)]" />
+            </div>
+
+            <div className="flex gap-3 items-stretch">
               <input
                 type="text"
                 value={joinCode}
                 maxLength={4}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="CODE"
-                className="flex-1 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white uppercase tracking-widest text-center text-lg focus:outline-none focus:border-gray-500"
+                aria-label="Room code"
+                className="ui-input flex-1 min-w-0 text-center text-xl uppercase tracking-[0.3em] font-bold"
               />
-              <button
+              <Button
+                variant="green"
                 disabled={!name.trim() || joinCode.length !== 4 || connecting}
                 onClick={() => onJoin(joinCode, name.trim())}
-                className="px-5 py-2 rounded-lg font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Join
-              </button>
+              </Button>
             </div>
-          </>
+          </div>
         )}
 
         {/* In-room view */}
         {inRoom && (
-          <>
+          <div className="flex flex-col gap-5">
             {/* Room code display */}
-            <div className="mb-6 text-center">
-              <p className="text-gray-400 text-sm mb-1">Room Code</p>
+            <div className="text-center">
+              <p className="ui-label mb-2">Room Code</p>
               <button
+                type="button"
                 onClick={handleCopyCode}
                 title="Click to copy"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 hover:border-violet-500 transition-colors group"
+                className="ui-input inline-flex w-auto items-center gap-3 !px-5 !py-2 cursor-pointer hover:!border-[var(--ui-cyan)]"
               >
-                <span className="text-4xl font-bold text-white tracking-[0.3em]">
+                <span className="text-4xl font-bold tracking-[0.3em] pl-[0.3em] text-[var(--ui-yellow)]">
                   {roomCode}
                 </span>
-                <span className="text-xs text-gray-500 group-hover:text-violet-400">
-                  {copied ? "Copied!" : "Copy"}
-                </span>
+                <span className="ui-label">{copied ? "Copied!" : "Copy"}</span>
               </button>
             </div>
 
+            {/* Discord invite — only shown inside the Activity */}
+            {isDiscordActivity() && (
+              <Button block variant="discord" onClick={handleShareInvite}>
+                Share invite on Discord
+              </Button>
+            )}
+
             {/* Player list */}
-            <div className="mb-6">
-              <p className="text-gray-400 text-sm mb-2">
-                Players ({participantCount}/4)
-              </p>
-              <div className="space-y-2">
+            <div>
+              <p className="ui-label mb-2">Players ({participantCount}/4)</p>
+              <div className="flex flex-col gap-2">
                 {players.map((p) => (
                   <div
                     key={p.slot}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                    className="ui-section !p-0 flex items-center justify-between gap-3 px-3 py-2"
+                    style={{ padding: "8px 12px" }}
                   >
-                    <span className="text-white">
+                    <span className="flex items-center gap-2 font-bold">
+                      <span
+                        className="ui-dot"
+                        style={{ backgroundColor: SLOT_COLORS[p.slot % SLOT_COLORS.length] }}
+                      />
                       {p.name}
                       {p.isHost && (
-                        <span className="ml-2 text-xs text-violet-400 font-semibold">
-                          (host)
-                        </span>
+                        <span className="ui-label !text-[var(--ui-yellow)]">Host</span>
                       )}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {p.isHost ? "Slot 1" : `Slot ${p.slot + 1}`}
-                    </span>
+                    <span className="ui-label">Slot {p.slot + 1}</span>
                   </div>
                 ))}
               </div>
@@ -156,59 +188,48 @@ export function LobbyScreen({
 
             {/* Host controls */}
             {isHost ? (
-              <div className="mb-4">
-                <label className="flex items-center gap-2 text-sm text-gray-300 mb-3 cursor-pointer">
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={fillBots}
                     onChange={(e) => setFillBots(e.target.checked)}
-                    className="w-4 h-4"
+                    className="ui-checkbox"
                   />
                   Fill empty slots with bots
                 </label>
-                <button
+                <Button
+                  block
+                  variant="green"
+                  size="lg"
                   disabled={!canStart}
                   onClick={() => onStart(fillBots)}
-                  className="w-full py-3 mb-2 rounded-lg font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {canStart
-                    ? "Start Game"
-                    : "Need at least 2 participants"}
-                </button>
-                <button
-                  onClick={onLeave}
-                  className="w-full py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
-                >
+                  {canStart ? "Start Game" : "Need at least 2 participants"}
+                </Button>
+                <Button block variant="red" size="sm" onClick={onLeave}>
                   Leave Room
-                </button>
+                </Button>
               </div>
             ) : (
-              <div className="mb-4 text-center">
-                <p className="text-gray-400 mb-3">Waiting for host to start…</p>
-                <button
-                  onClick={onLeave}
-                  className="w-full py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
-                >
+              <div className="flex flex-col gap-3 text-center">
+                <p className="text-[var(--ui-muted)]">Waiting for host to start…</p>
+                <Button block variant="red" size="sm" onClick={onLeave}>
                   Leave Room
-                </button>
+                </Button>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* Error message */}
-        {error && (
-          <p className="mt-3 text-center text-red-400 text-sm">{error}</p>
-        )}
+        {error && <p className="ui-error mt-4">{error}</p>}
 
         {/* Back to menu */}
-        <button
-          onClick={onBack}
-          className="mt-4 w-full text-center text-gray-500 hover:text-gray-300 text-sm"
-        >
-          ← Back to menu
-        </button>
-      </div>
-    </div>
+        <div className="mt-5 text-center">
+          <LinkButton onClick={onBack}>← Back to menu</LinkButton>
+        </div>
+      </Panel>
+    </Screen>
   );
 }

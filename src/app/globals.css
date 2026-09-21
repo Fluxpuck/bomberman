@@ -13,6 +13,348 @@ body {
   overflow: hidden;
 }
 
+/* Sprite animations (src/components/sprites.tsx) */
+@keyframes bombTick{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes bombSpark{0%,100%{opacity:.5;transform:scale(.75) rotate(0deg)}50%{opacity:1;transform:scale(1.3) rotate(25deg)}}
+@keyframes bombShock{0%{opacity:.7;transform:scale(.6)}100%{opacity:0;transform:scale(1.5)}}
+@keyframes blastFlicker{0%,100%{opacity:1}50%{opacity:.78}}
+@keyframes puHover{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes puPulse{0%,100%{opacity:.35;transform:scale(.92)}50%{opacity:.75;transform:scale(1.06)}}
+@keyframes puSpark{0%,100%{opacity:.5;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+@keyframes bomberBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes bomberStep{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-3px) rotate(2deg)}}
+@keyframes bomberGlow{0%,100%{opacity:.55}50%{opacity:1}}
+
+/* ==========================================================================
+   Bomb Blast Arena UI kit - shared by every screen (see components/ui.tsx).
+   Tokens first, then panel / type / button / form / HUD primitives.
+   ========================================================================== */
+:root {
+  --ui-ink: #0a1120;
+  --ui-panel-top: #16233f;
+  --ui-panel-bottom: #0c1526;
+  --ui-line: rgba(124, 196, 255, 0.24);
+  --ui-text: #e8f0fb;
+  --ui-muted: #8fa6c9;
+  --ui-yellow: #ffce3d;
+  --ui-orange-deep: #a8410c;
+  --ui-cyan: #5fd7f2;
+  --ui-danger: #ff6b6b;
+  --ui-ok: #4ade80;
+  --ui-mono: var(--font-mono), "JetBrains Mono", "Courier New", monospace;
+  --ui-display: var(--font-bungee), "Bungee", sans-serif;
+  --ui-pixel: "Courier New", Courier, monospace;
+}
+
+body {
+  font-family: var(--font-space), "Space Grotesk", Helvetica, sans-serif;
+  color: var(--ui-text);
+}
+
+/* Full-screen scrim that hosts a panel; scrolls on very small screens. */
+.ui-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  background: radial-gradient(70% 55% at 50% 30%, rgba(11, 21, 38, 0.55) 0%, rgba(7, 13, 24, 0.9) 100%);
+  backdrop-filter: blur(3px);
+}
+.ui-screen > .ui-panel { margin: auto; }
+
+.ui-panel {
+  width: min(var(--ui-w, 440px), 100%);
+  padding: 28px;
+  color: var(--ui-text);
+  background: linear-gradient(180deg, var(--ui-panel-top) 0%, var(--ui-panel-bottom) 100%);
+  border: 2px solid var(--ui-line);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.ui-panel--glass {
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(10, 17, 32, 0.78);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Type */
+.ui-title {
+  font-family: var(--ui-display);
+  font-weight: 400;
+  font-size: clamp(26px, 5vw, 34px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: var(--ui-yellow);
+  text-shadow: 0 3px 0 var(--ui-orange-deep), 0 0 22px rgba(255, 154, 43, 0.4);
+}
+.ui-title--red { color: #ff7b7b; text-shadow: 0 3px 0 #8e1f1f, 0 0 22px rgba(239, 68, 68, 0.45); }
+.ui-title--green { color: #6ff0a0; text-shadow: 0 3px 0 #14663a, 0 0 22px rgba(74, 222, 128, 0.4); }
+.ui-title--cyan { color: var(--ui-cyan); text-shadow: 0 3px 0 #0f5f73, 0 0 22px rgba(95, 215, 242, 0.4); }
+.ui-subtitle {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ui-muted);
+}
+.ui-label {
+  font-family: var(--ui-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.ui-hint { font-size: 12px; color: var(--ui-muted); text-align: center; }
+.ui-error {
+  font-size: 13px;
+  text-align: center;
+  color: var(--ui-danger);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+/* Grouped content (stats, player list) */
+.ui-section {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(124, 196, 255, 0.14);
+}
+.ui-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(124, 196, 255, 0.16);
+}
+.ui-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 14px;
+  color: var(--ui-muted);
+}
+.ui-row > :last-child { font-family: var(--ui-mono); font-weight: 700; color: var(--ui-text); }
+.ui-dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35); }
+
+/* Text input */
+.ui-input {
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ui-text);
+  background: var(--ui-ink);
+  border: 2px solid var(--ui-line);
+  border-radius: 10px;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.ui-input::placeholder { color: rgba(143, 166, 201, 0.55); }
+.ui-input:focus {
+  outline: none;
+  border-color: var(--ui-cyan);
+  box-shadow: 0 0 0 3px rgba(95, 215, 242, 0.25);
+}
+.ui-checkbox { width: 18px; height: 18px; accent-color: var(--ui-yellow); cursor: pointer; }
+
+/* Slider */
+.ui-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(124, 196, 255, 0.25);
+  cursor: pointer;
+}
+.ui-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ui-yellow);
+  border: 2px solid var(--ui-orange-deep);
+}
+.ui-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ui-yellow);
+  border: 2px solid var(--ui-orange-deep);
+}
+.ui-range:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+
+/* Progress bar */
+.ui-bar { height: 8px; border-radius: 4px; overflow: hidden; background: rgba(124, 196, 255, 0.18); }
+.ui-bar > i { display: block; height: 100%; border-radius: 4px; transition: width 1s linear, background-color 0.5s; }
+
+/*
+ * Buttons. Chunky arcade keys: raised at rest via a thicker bottom border (so
+ * the hover ring, an outline, wraps the whole button); lift + glow + ring on
+ * hover/focus; pressed on click. Colour comes from the variant classes, size
+ * from --btn-fs / --btn-py / --depth / --bw (overridable inline).
+ */
+.ui-btn {
+  --lift: 0px;
+  --bw: 3px;
+  --depth: 5px;
+  --btn-fs: 17px;
+  --btn-py: 10px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: var(--btn-py) 18px;
+  font-family: var(--ui-pixel);
+  font-weight: 700;
+  font-size: var(--btn-fs);
+  letter-spacing: 0.05em;
+  text-align: center;
+  color: var(--btn-fg);
+  background-color: var(--btn-bg);
+  border: var(--bw) solid var(--btn-border);
+  border-bottom-width: calc(var(--bw) + var(--depth));
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  transform: translateY(var(--lift));
+  outline: 4px solid transparent;
+  outline-offset: 0;
+  box-shadow:
+    0 calc(var(--depth) + 4px) 14px rgba(0, 0, 0, 0.45),
+    inset 0 3px 0 rgba(255, 255, 255, 0.28);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out, filter 120ms ease-out,
+    outline-color 120ms ease-out;
+}
+.ui-btn:hover,
+.ui-btn:focus-visible {
+  --lift: -4px;
+  filter: brightness(1.12) saturate(1.1);
+  outline-color: #fff;
+  box-shadow:
+    0 calc(var(--depth) + 12px) 22px rgba(0, 0, 0, 0.5),
+    0 0 34px 6px var(--btn-glow),
+    inset 0 3px 0 rgba(255, 255, 255, 0.4);
+}
+.ui-btn:active {
+  --lift: calc(var(--depth) - 2px);
+  filter: brightness(0.95);
+  outline-color: #fff;
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.15);
+  transition-duration: 40ms;
+}
+.ui-btn:disabled {
+  --lift: 0px;
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.8);
+  opacity: 0.6;
+  outline-color: transparent;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.15);
+}
+.ui-btn:disabled::before,
+.ui-btn:disabled::after { display: none; }
+
+.ui-btn--sm { --btn-fs: 14px; --btn-py: 6px; --depth: 4px; --bw: 2px; border-radius: 8px; padding-inline: 14px; }
+.ui-btn--lg { --btn-fs: 20px; --btn-py: 13px; --depth: 6px; }
+
+.ui-btn--green   { --btn-bg: #4ade80; --btn-border: #166534; --btn-fg: #0a0a0a; --btn-glow: #4ade80; }
+.ui-btn--blue    { --btn-bg: #60a5fa; --btn-border: #1e3a8a; --btn-fg: #fff; --btn-glow: #60a5fa; }
+.ui-btn--orange  { --btn-bg: #f59e0b; --btn-border: #b45309; --btn-fg: #fff; --btn-glow: #f59e0b; }
+.ui-btn--red     { --btn-bg: #ef4444; --btn-border: #991b1b; --btn-fg: #fff; --btn-glow: #ef4444; }
+.ui-btn--purple  { --btn-bg: #a78bfa; --btn-border: #5b21b6; --btn-fg: #fff; --btn-glow: #a78bfa; }
+.ui-btn--discord { --btn-bg: #5865f2; --btn-border: #3a44b0; --btn-fg: #fff; --btn-glow: #5865f2; }
+.ui-btn--neutral { --btn-bg: #5d6f8f; --btn-border: #2b3648; --btn-fg: #fff; --btn-glow: #8fa6c9; }
+.ui-btn--card {
+  --btn-bg: #18274a;
+  --btn-border: #0b1526;
+  --btn-fg: var(--ui-text);
+  --btn-glow: var(--ui-cyan);
+  --depth: 4px;
+  flex-direction: column;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+/* Hover pointers: slide in beside the label (skipped for small / card / disabled) */
+.ui-btn::before,
+.ui-btn::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - var(--depth) / 2);
+  width: 0;
+  height: 0;
+  border: 0 solid transparent;
+  border-width: 0.32em 0 0.32em 0.5em;
+  border-left-color: currentColor;
+  opacity: 0;
+  transform: translate(-8px, -50%);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+.ui-btn::before { left: 6%; }
+.ui-btn::after { right: 6%; transform: translate(8px, -50%) scaleX(-1); }
+.ui-btn:hover::before,
+.ui-btn:focus-visible::before { opacity: 1; transform: translate(0, -50%); }
+.ui-btn:hover::after,
+.ui-btn:focus-visible::after { opacity: 1; transform: translate(0, -50%) scaleX(-1); }
+.ui-btn--sm::before, .ui-btn--sm::after,
+.ui-btn--card::before, .ui-btn--card::after { display: none; }
+
+/* Quiet text-style action (e.g. "Back to menu") */
+.ui-link {
+  font-size: 14px;
+  color: var(--ui-muted);
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 120ms, background-color 120ms;
+}
+.ui-link:hover,
+.ui-link:focus-visible { color: #fff; background: rgba(124, 196, 255, 0.14); outline: none; }
+
+/* Touch d-pad keys */
+.ui-pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ui-text);
+  background: rgba(10, 17, 32, 0.72);
+  border: 2px solid rgba(124, 196, 255, 0.32);
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+  transition: transform 60ms, background-color 60ms;
+}
+.ui-pad:active {
+  transform: scale(0.93);
+  background: var(--ui-yellow);
+  color: var(--ui-ink);
+  border-color: var(--ui-orange-deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn, .ui-btn::before, .ui-btn::after, .ui-input, .ui-link { transition: none; }
+}
+
 @layer utilities {
   .font-pixel {
     font-family: 'Courier New', Courier, monospace;

@@ -6,7 +6,7 @@ services:
         # Baked into the client bundle at build time. localhost works when
         # browsing from the same machine that runs the compose stack.
         # For a Cloudflare Tunnel deployment set this to the public relay
-        # URL, e.g. wss://ws.bomberman.example.com
+        # URL, e.g. wss://ws.bomb-blast-arena.example.com
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3001}
     restart: unless-stopped
     ports:

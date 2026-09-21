@@ -1,6 +1,7 @@
 import { GAME_CONFIG } from "@/game/core/config";
 import { GameStats, PlayerStats } from "../../game/hooks/tracker";
 import { GameState } from "../../types/game";
+import { Button, Heading, Panel, Screen, Section, StatRow } from "../ui";
 
 export interface EndScreenProps {
   gameState: GameState;
@@ -16,12 +17,10 @@ export function EndScreen({
   gameState,
   winner,
   players,
-  timeLeft = 0,
   gameStats,
   onReturnToMenu,
   onPlayAgain,
 }: EndScreenProps) {
-  const isGameOver = gameState === GameState.GAME_OVER;
   const isWin = gameState === GameState.WIN;
 
   // Format time as minutes:seconds
@@ -38,133 +37,55 @@ export function EndScreen({
     GAME_CONFIG.timeLimit * 1000
   );
 
+  const winnerName =
+    winner?.name ||
+    `${winner?.isPlayer ? "Player" : "Computer"} ${winner?.id?.split("-")[1] || ""}`;
+
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 w-[28rem] max-w-full shadow-2xl">
-        {/* Header */}
-        <div className="text-center mb-6">
-          {isGameOver && (
-            <h1 className="text-3xl font-bold text-red-500 mb-2">Game Over</h1>
-          )}
-          {isWin && (
-            <h1 className="text-3xl font-bold text-green-500 mb-2">
-              Victory!
-            </h1>
-          )}
-          {winner && (
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div
-                className="w-6 h-6 rounded-full"
-                style={{ backgroundColor: winner?.color || "#4A90E2" }}
-              />
-              <span className="text-xl font-semibold text-white">
-                {winner?.name || `${winner?.isPlayer ? "Player" : "Computer"} ${winner?.id?.split("-")[1] || ""}`} Wins!
-              </span>
-            </div>
-          )}
-        </div>
+    <Screen>
+      <Panel width={448}>
+        <Heading
+          title={isWin ? "VICTORY!" : "GAME OVER"}
+          tone={isWin ? "green" : "red"}
+        />
 
-        {/* Game Stats */}
-        <div className="bg-gray-800 rounded-lg p-4 mb-6">
-          <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-700 pb-2">
-            Game Statistics
-          </h2>
-
-          <div className="grid grid-cols-2 gap-y-2 text-sm">
-            <div className="text-gray-400">Time Played</div>
-            <div className="text-right font-medium text-white">
-              {formatTime(timePlayed)}
-            </div>
-
-            {/* {timeLeft > 0 && (
-              <>
-                <div className="text-gray-400">Time Left</div>
-                <div className="text-right font-medium text-white">
-                  {formatTime(timeLeft)}
-                </div>
-              </>
-            )} */}
-
-            <div className="text-gray-400">Bombs Placed</div>
-            <div className="text-right font-medium text-white">
-              {gameStats.totalBombsPlaced}
-            </div>
-
-            <div className="text-gray-400">Blocks Destroyed</div>
-            <div className="text-right font-medium text-white">
-              {gameStats.totalBlocksDestroyed}
-            </div>
-
-            <div className="text-gray-400">Total Kills</div>
-            <div className="text-right font-medium text-white">
-              {gameStats.totalKills}
-            </div>
-          </div>
-        </div>
-
-        {/* Player Stats */}
-        {players && players.length > 0 && (
-          <div className="bg-gray-800 rounded-lg p-4 mb-6">
-            {players.map((player) => (
-              <div key={player.id}>
-                <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: player.color }}
-                  />
-                  <span>{player.name} Stats</span>
-                </h2>
-
-                <div className="grid grid-cols-2 gap-y-2 text-sm">
-                  <div className="text-gray-400">Score</div>
-                  <div className="text-right font-medium text-white">
-                    {player.score}
-                  </div>
-
-                  <div className="text-gray-400">Lives Left</div>
-                  <div className="text-right font-medium text-white">
-                    {player.lives}
-                  </div>
-
-                  <div className="text-gray-400">Bombs Placed</div>
-                  <div className="text-right font-medium text-white">
-                    {player.bombsPlaced}
-                  </div>
-
-                  <div className="text-gray-400">Blocks Destroyed</div>
-                  <div className="text-right font-medium text-white">
-                    {player.blocksDestroyed}
-                  </div>
-
-                  <div className="text-gray-400">Kills</div>
-                  <div className="text-right font-medium text-white">
-                    {player.kills}
-                  </div>
-                </div>
-              </div>
-            ))}
+        {winner && (
+          <div className="flex items-center justify-center gap-3 mb-6 -mt-2">
+            <span className="ui-dot" style={{ backgroundColor: winner.color || "#4A90E2" }} />
+            <span className="text-xl font-bold">{winnerName} Wins!</span>
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex gap-4 justify-center">
-          {onPlayAgain && (
-            <button
-              onClick={onPlayAgain}
-              className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-            >
-              Play Again
-            </button>
-          )}
+        <div className="flex flex-col gap-4 mb-6">
+          <Section title="Game Statistics">
+            <StatRow label="Time Played" value={formatTime(timePlayed)} />
+            <StatRow label="Bombs Placed" value={gameStats.totalBombsPlaced} />
+            <StatRow label="Blocks Destroyed" value={gameStats.totalBlocksDestroyed} />
+            <StatRow label="Total Kills" value={gameStats.totalKills} />
+          </Section>
 
-          <button
-            onClick={onReturnToMenu}
-            className="px-5 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
-          >
-            Main Menu
-          </button>
+          {players?.map((player) => (
+            <Section key={player.id} title={`${player.name} Stats`} dotColor={player.color}>
+              <StatRow label="Score" value={player.score} />
+              <StatRow label="Lives Left" value={player.lives} />
+              <StatRow label="Bombs Placed" value={player.bombsPlaced} />
+              <StatRow label="Blocks Destroyed" value={player.blocksDestroyed} />
+              <StatRow label="Kills" value={player.kills} />
+            </Section>
+          ))}
         </div>
-      </div>
-    </div>
+
+        <div className="flex gap-4 justify-center flex-wrap">
+          {onPlayAgain && (
+            <Button variant="green" onClick={onPlayAgain}>
+              Play Again
+            </Button>
+          )}
+          <Button variant="neutral" onClick={onReturnToMenu}>
+            Main Menu
+          </Button>
+        </div>
+      </Panel>
+    </Screen>
   );
 }

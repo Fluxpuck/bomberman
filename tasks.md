@@ -1,8 +1,8 @@
-# Bomberman AI System
+# Bomb Blast Arena AI System
 
 ## Overview
 
-Implement intelligent AI behavior for computer-controlled players in Bomberman game with target prioritization, pathfinding, obstacle avoidance, bomb placement, and safety mechanics.
+Implement intelligent AI behavior for computer-controlled players in Bomb Blast Arena with target prioritization, pathfinding, obstacle avoidance, bomb placement, and safety mechanics.
 
 ---
 

@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-**lo-fi-bomberman** is a browser-based Bomberman game built with Next.js 16 (App Router), TypeScript, and Tailwind CSS. It supports 1-4 players (1 human + up to 3 AI opponents) with bomb placement, destructible barrels, power-ups, and a timed game mode.
+**Bomb Blast Arena** (lo-fi-bomberman) is a browser-based bombing game built with Next.js 16 (App Router), TypeScript, and Tailwind CSS. It supports 1-4 players (1 human + up to 3 AI opponents) with bomb placement, destructible barrels, power-ups, and a timed game mode.
 
 The game loop and rendering are **imperative DOM manipulation** driven by `requestAnimationFrame`, not React state. React is used only for the surrounding UI (screens, HUDs, audio controls). The game grid is a real DOM element built with `document.createElement`.
 
@@ -37,6 +37,7 @@ src/
   components/          React UI components
     screens/           Start, Lobby, Pause, End screens + HUDs
     AudioController.tsx
+  discord/             Discord Activity integration (SDK client, rich presence)
   game/                Vanilla TS game engine (no React)
     core/              Config constants (config.ts)
     assets/            DOM element factories (blocks, character, dynamite, powerups)
@@ -177,6 +178,44 @@ run headless on the server or in lockstep. Instead:
 `node server/smoke-test.js` (after starting the relay) verifies the room/relay
 protocol: create, join, bidirectional relay, lock rejects late joins, hostLeft
 on host disconnect.
+
+## Discord Activity (rich presence)
+
+The game can run as a Discord Activity with rich presence and share-link
+invites. Everything in `src/discord/` no-ops outside Discord — detection is
+the `frame_id` query param Discord injects into the iframe URL
+(`isDiscordActivity()` in `src/discord/client.ts`).
+
+### Env vars (see `.env.example`)
+
+- `NEXT_PUBLIC_DISCORD_CLIENT_ID` — app client ID (browser-exposed)
+- `DISCORD_CLIENT_SECRET` — server-only, used by `src/app/api/token/route.ts`
+  to exchange the `authorize()` code for an access token
+- `NEXT_PUBLIC_WS_URL` — public relay origin (existing var)
+
+### Dev portal setup (manual)
+
+1. Enable **Activities**, add a placeholder OAuth2 redirect URI (`https://127.0.0.1`).
+2. **URL Mappings**: `/` → the public app URL, `/ws` → the public relay host.
+   The `/ws` prefix is `DISCORD_CONFIG.wsProxyPrefix`; `patchUrlMappings` in
+   `client.ts` rewrites `new WebSocket(getServerUrl())` to the proxied path.
+3. Dev workflow needs tunnels: `cloudflared tunnel --url http://localhost:3000`
+   for the app and a second tunnel for the relay (`yarn ws` on :3001), then
+   point the mappings at the tunnel hosts. The relay must be publicly
+   reachable inside Discord — `localhost` cannot be a mapping target.
+
+### Key modules
+
+| Module | Responsibility |
+| --- | --- |
+| `src/discord/client.ts` | Detection, SDK init, OAuth (`identify` + `rpc.activities.write`), ws proxy patching, invite `customId` parsing |
+| `src/discord/presence.ts` | `updatePresence(gameState, ctx)` — maps game state to `setActivity` payloads (party size, elapsed timer, winner) |
+| `src/app/api/token/route.ts` | OAuth code → access token exchange |
+
+Presence updates fire on `GameState` transitions in `page.tsx` (never
+per-frame — Discord rate-limits `SET_ACTIVITY`). Lobby invites use
+`commands.shareLink({ custom_id: "room:<CODE>" })`; recipients launch the
+Activity with that code and land in the lobby with it pre-filled.
 
 ## Controls
 

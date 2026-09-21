@@ -1,5 +1,5 @@
 {
-  "name": "lofi-bomberman",
+  "name": "bomb-blast-arena",
   "version": "1.0.0",
   "private": true,
   "packageManager": "yarn@4.12.0",
@@ -16,6 +16,7 @@
     "ws": "node server/ws-server.js"
   },
   "dependencies": {
+    "@discord/embedded-app-sdk": "2.5.0",
     "next": "16.3.5",
     "react": "19.2.0",
     "react-dom": "19.2.0",
