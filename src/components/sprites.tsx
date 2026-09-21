@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
  * Static React renderings of the game sprites (Bomb, Bomber, Powerup, Tile)
  * from the design project. Every sprite is authored in a 120px box and scaled
  * with a transform, so `scale` 1 = one 120px tile. Keyframes live in
- * marketing.css.
+ * the Tailwind config (animate-* utilities).
  */
 
 const OFF: CSSProperties = { display: "none" };
@@ -80,13 +80,13 @@ export function Bomb({
       borderRadius: inner ? 22 : 40,
       background: `linear-gradient(${angle},${stops})`,
       filter: inner ? "blur(1px)" : "blur(2px)",
-      animation: inner ? undefined : "blastFlicker .28s ease-in-out infinite",
     });
   };
 
   return (
     <Mount scale={scale}>
       <div
+        className="animate-bomb-shock"
         style={
           blast
             ? box({
@@ -97,13 +97,12 @@ export function Bomb({
                 borderRadius: "50%",
                 border: `6px solid ${hotPale}`,
                 filter: "blur(1.5px)",
-                animation: "bombShock 1.1s ease-out infinite",
               })
             : OFF
         }
       />
-      <div style={arm("h", false)} />
-      <div style={arm("v", false)} />
+      <div className="animate-blast-flicker" style={arm("h", false)} />
+      <div className="animate-blast-flicker" style={arm("v", false)} />
       <div style={arm("h", true)} />
       <div style={arm("v", true)} />
       <div
@@ -149,6 +148,7 @@ export function Bomb({
         }
       />
       <div
+        className={state === "ticking" ? "animate-bomb-tick" : undefined}
         style={{
           position: "absolute",
           left: 0,
@@ -157,8 +157,6 @@ export function Bomb({
           height: 120,
           display: blast ? "none" : "block",
           transformOrigin: "60px 100px",
-          animation:
-            state === "ticking" ? "bombTick .7s ease-in-out infinite" : "none",
         }}
       >
         <div
@@ -216,6 +214,7 @@ export function Bomb({
           })}
         />
         <div
+          className="animate-bomb-spark"
           style={box({
             left: 70,
             top: -4,
@@ -224,7 +223,6 @@ export function Bomb({
             borderRadius: "50%",
             background: hotPale,
             boxShadow: `0 0 18px ${hot}, 0 0 6px #fff`,
-            animation: "bombSpark .5s ease-in-out infinite",
           })}
         />
       </div>
@@ -261,10 +259,10 @@ export function Bomber({
   const dy = facing === "up" ? -4 : facing === "down" ? 2 : 0;
 
   const anim = walking
-    ? "bomberStep .42s ease-in-out infinite"
+    ? "animate-bomber-step"
     : hurt
-      ? "none"
-      : "bomberBob 2.4s ease-in-out infinite";
+      ? undefined
+      : "animate-bomber-bob";
 
   const eye = (side: "l" | "r"): CSSProperties => ({
     position: "absolute",
@@ -301,6 +299,7 @@ export function Bomber({
   return (
     <Mount scale={scale}>
       <div
+        className={anim}
         style={{
           position: "absolute",
           left: 0,
@@ -308,7 +307,6 @@ export function Bomber({
           width: 120,
           height: 120,
           transform: hurt ? "rotate(-8deg)" : "none",
-          animation: anim,
         }}
       >
         <div
@@ -362,6 +360,7 @@ export function Bomber({
           }}
         />
         <div
+          className="animate-bomber-glow"
           style={{
             position: "absolute",
             left: 52,
@@ -372,7 +371,6 @@ export function Bomber({
             background: accent,
             border: `2px solid ${ink}`,
             boxShadow: `0 0 12px ${accent}`,
-            animation: "bomberGlow 2.2s ease-in-out infinite",
           }}
         />
         <div style={arm(8, -25)} />
@@ -498,6 +496,7 @@ export function Powerup({
   return (
     <Mount scale={scale}>
       <div
+        className="animate-pu-pulse"
         style={{
           position: "absolute",
           left: 6,
@@ -506,17 +505,16 @@ export function Powerup({
           height: 108,
           borderRadius: 28,
           background: `radial-gradient(circle at 50% 50%, ${color} 0%, rgba(0,0,0,0) 68%)`,
-          animation: "puPulse 2s ease-in-out infinite",
         }}
       />
       <div
+        className="animate-pu-hover"
         style={{
           position: "absolute",
           left: 0,
           top: 0,
           width: 120,
           height: 120,
-          animation: "puHover 2.2s ease-in-out infinite",
         }}
       >
         <div
@@ -593,6 +591,7 @@ export function Powerup({
           }
         />
         <div
+          className="animate-pu-spark"
           style={
             bomb
               ? {
@@ -604,7 +603,6 @@ export function Powerup({
                   borderRadius: "50%",
                   background: "#fff3c4",
                   boxShadow: "0 0 14px #ffce3d",
-                  animation: "puSpark 1s ease-in-out infinite",
                 }
               : OFF
           }

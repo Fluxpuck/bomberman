@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from "../../game/core/config";
+import { cx, Label, PANEL_GLASS, ProgressBar } from "../ui";
 
 interface GameHUDProps {
   timeElapsedMs: number;
@@ -37,23 +38,23 @@ export function GameHUD({
   const timeColor = getTimeColor();
 
   return (
-    <div className="ui-panel ui-panel--glass fixed top-[7.5rem] sm:top-4 left-1/2 transform -translate-x-1/2 portrait:top-auto portrait:bottom-2 portrait:left-2 portrait:-translate-x-0 z-50 min-w-[120px] sm:min-w-[160px] portrait:min-w-0 text-center">
+    <div className={cx(PANEL_GLASS, "px-3 py-2 rounded-xl fixed top-[7.5rem] sm:top-4 left-1/2 transform -translate-x-1/2 portrait:top-auto portrait:bottom-2 portrait:left-2 portrait:-translate-x-0 z-50 min-w-[120px] sm:min-w-[160px] portrait:min-w-0 text-center")}>
       {/* Time Display (label and bar hidden in portrait — time only) */}
       <div className="mb-1 sm:mb-2 portrait:mb-0">
-        <div className="ui-label !text-[9px] sm:!text-[10px] mb-0.5 portrait:hidden">
+        <Label className="block !text-[9px] sm:!text-[10px] mb-0.5 portrait:hidden">
           Time remaining
-        </div>
+        </Label>
         <div
-          className="text-xl sm:text-2xl font-bold tabular-nums"
-          style={{ fontFamily: "var(--ui-mono)", color: timeColor }}
+          className="font-mono text-xl sm:text-2xl font-bold tabular-nums"
+          style={{ color: timeColor }}
         >
           {formattedTime}
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="ui-bar portrait:hidden">
-        <i style={{ width: `${progressPercentage}%`, backgroundColor: timeColor }} />
+      <div className="portrait:hidden">
+        <ProgressBar percent={progressPercentage} color={timeColor} />
       </div>
     </div>
   );

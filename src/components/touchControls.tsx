@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Direction } from "../types/game";
 import { Bomb } from "./sprites";
+import { PAD } from "./ui";
 
 interface TouchControlsProps {
   onMove: (direction: Direction) => void;
@@ -17,7 +18,7 @@ const isTouchDevice = (): boolean => {
   return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };
 
-const padButton = "ui-pad select-none touch-none";
+const padButton = PAD;
 
 /**
  * On-screen d-pad + bomb button for touch devices. Each tap queues one move

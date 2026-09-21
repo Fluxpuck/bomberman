@@ -18,7 +18,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${bungee.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>{children}</body>
+      <body
+        className={`${bungee.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} overflow-hidden font-sans text-ui-text`}
+      >{children}</body>
     </html>
   );
 }

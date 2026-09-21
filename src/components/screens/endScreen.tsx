@@ -1,7 +1,7 @@
 import { GAME_CONFIG } from "@/game/core/config";
 import { GameStats, PlayerStats } from "../../game/hooks/tracker";
 import { GameState } from "../../types/game";
-import { Button, Heading, Panel, Screen, Section, StatRow } from "../ui";
+import { Button, Dot, Heading, Panel, Screen, Section, StatRow } from "../ui";
 
 export interface EndScreenProps {
   gameState: GameState;
@@ -51,7 +51,7 @@ export function EndScreen({
 
         {winner && (
           <div className="flex items-center justify-center gap-3 mb-6 -mt-2">
-            <span className="ui-dot" style={{ backgroundColor: winner.color || "#4A90E2" }} />
+            <Dot color={winner.color || "#4A90E2"} />
             <span className="text-xl font-bold">{winnerName} Wins!</span>
           </div>
         )}

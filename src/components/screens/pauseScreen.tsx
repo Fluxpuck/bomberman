@@ -1,4 +1,4 @@
-import { Button, Heading, Panel, Screen } from "../ui";
+import { Button, Heading, Hint, Panel, Screen } from "../ui";
 
 interface PauseScreenProps {
   onReturnToMenu: () => void;
@@ -20,9 +20,9 @@ export function PauseScreen({ onReturnToMenu, onResume }: PauseScreenProps) {
           </Button>
         </div>
 
-        <p className="ui-hint mt-6">
+        <Hint className="mt-6">
           WASD to move · Space to place bombs · ESC to pause/resume
-        </p>
+        </Hint>
       </Panel>
     </Screen>
   );

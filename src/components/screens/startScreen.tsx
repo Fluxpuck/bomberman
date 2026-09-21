@@ -66,7 +66,7 @@ export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
   const tileCols =
     Math.ceil((typeof window !== "undefined" ? window.innerWidth : 1920) / (tile + tileGap)) + 1;
 
-  // Size the shared button to the layout unit (see .ui-btn in globals.css).
+  // Size the shared button to the layout unit (see BUTTON_BASE in ui.tsx).
   const buttonSize = {
     "--bw": `${Math.max(2, 4 * u)}px`,
     "--depth": `${Math.max(3, 6 * u)}px`,

@@ -2,7 +2,20 @@ import { useState } from "react";
 import { getDiscordSdk, isDiscordActivity } from "../../discord/client";
 import { DISCORD_CONFIG } from "../../game/core/config";
 import { RoomPlayer } from "../../types/multiplayer";
-import { Button, Heading, LinkButton, Panel, Screen } from "../ui";
+import {
+  Button,
+  Checkbox,
+  cx,
+  Dot,
+  ErrorText,
+  Heading,
+  INPUT_BASE,
+  Label,
+  LinkButton,
+  Panel,
+  Screen,
+  TextInput,
+} from "../ui";
 
 interface LobbyScreenProps {
   roomCode: string | null;
@@ -83,17 +96,15 @@ export function LobbyScreen({
         {!inRoom && (
           <div className="flex flex-col gap-4">
             <div>
-              <label htmlFor="nickname" className="ui-label block mb-2">
-                Your nickname
+              <label htmlFor="nickname" className="block mb-2">
+                <Label>Your nickname</Label>
               </label>
-              <input
+              <TextInput
                 id="nickname"
-                type="text"
                 value={name}
                 maxLength={16}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter a nickname"
-                className="ui-input"
               />
             </div>
 
@@ -108,20 +119,19 @@ export function LobbyScreen({
             </Button>
 
             <div className="flex items-center gap-3">
-              <span className="flex-1 h-px bg-[var(--ui-line)]" />
-              <span className="ui-label">or join</span>
-              <span className="flex-1 h-px bg-[var(--ui-line)]" />
+              <span className="flex-1 h-px bg-ui-line" />
+              <Label>or join</Label>
+              <span className="flex-1 h-px bg-ui-line" />
             </div>
 
             <div className="flex gap-3 items-stretch">
-              <input
-                type="text"
+              <TextInput
                 value={joinCode}
                 maxLength={4}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="CODE"
                 aria-label="Room code"
-                className="ui-input flex-1 min-w-0 text-center text-xl uppercase tracking-[0.3em] font-bold"
+                className="flex-1 min-w-0 !w-auto text-center !text-xl uppercase tracking-[0.3em] font-bold"
               />
               <Button
                 variant="green"
@@ -139,17 +149,17 @@ export function LobbyScreen({
           <div className="flex flex-col gap-5">
             {/* Room code display */}
             <div className="text-center">
-              <p className="ui-label mb-2">Room Code</p>
+              <Label className="block mb-2">Room Code</Label>
               <button
                 type="button"
                 onClick={handleCopyCode}
                 title="Click to copy"
-                className="ui-input inline-flex w-auto items-center gap-3 !px-5 !py-2 cursor-pointer hover:!border-[var(--ui-cyan)]"
+                className={cx(INPUT_BASE, "inline-flex items-center gap-3 px-5 py-2 cursor-pointer hover:border-ui-cyan")}
               >
-                <span className="text-4xl font-bold tracking-[0.3em] pl-[0.3em] text-[var(--ui-yellow)]">
+                <span className="text-4xl font-bold tracking-[0.3em] pl-[0.3em] text-ui-yellow">
                   {roomCode}
                 </span>
-                <span className="ui-label">{copied ? "Copied!" : "Copy"}</span>
+                <Label>{copied ? "Copied!" : "Copy"}</Label>
               </button>
             </div>
 
@@ -162,25 +172,21 @@ export function LobbyScreen({
 
             {/* Player list */}
             <div>
-              <p className="ui-label mb-2">Players ({participantCount}/4)</p>
+              <Label className="block mb-2">Players ({participantCount}/4)</Label>
               <div className="flex flex-col gap-2">
                 {players.map((p) => (
                   <div
                     key={p.slot}
-                    className="ui-section !p-0 flex items-center justify-between gap-3 px-3 py-2"
-                    style={{ padding: "8px 12px" }}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.04] border border-[rgba(124,196,255,.14)]"
                   >
                     <span className="flex items-center gap-2 font-bold">
-                      <span
-                        className="ui-dot"
-                        style={{ backgroundColor: SLOT_COLORS[p.slot % SLOT_COLORS.length] }}
-                      />
+                      <Dot color={SLOT_COLORS[p.slot % SLOT_COLORS.length]} />
                       {p.name}
                       {p.isHost && (
-                        <span className="ui-label !text-[var(--ui-yellow)]">Host</span>
+                        <Label className="!text-ui-yellow">Host</Label>
                       )}
                     </span>
-                    <span className="ui-label">Slot {p.slot + 1}</span>
+                    <Label>Slot {p.slot + 1}</Label>
                   </div>
                 ))}
               </div>
@@ -190,11 +196,9 @@ export function LobbyScreen({
             {isHost ? (
               <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={fillBots}
                     onChange={(e) => setFillBots(e.target.checked)}
-                    className="ui-checkbox"
                   />
                   Fill empty slots with bots
                 </label>
@@ -213,7 +217,7 @@ export function LobbyScreen({
               </div>
             ) : (
               <div className="flex flex-col gap-3 text-center">
-                <p className="text-[var(--ui-muted)]">Waiting for host to start…</p>
+                <p className="text-ui-muted">Waiting for host to start…</p>
                 <Button block variant="red" size="sm" onClick={onLeave}>
                   Leave Room
                 </Button>
@@ -223,7 +227,7 @@ export function LobbyScreen({
         )}
 
         {/* Error message */}
-        {error && <p className="ui-error mt-4">{error}</p>}
+        {error && <ErrorText className="mt-4">{error}</ErrorText>}
 
         {/* Back to menu */}
         <div className="mt-5 text-center">

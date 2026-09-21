@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Bungee, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import type { CSSProperties, ReactNode } from "react";
-import "./marketing.css";
 import {
   Bomb,
   Bomber,
@@ -161,7 +160,7 @@ const modeButton: CSSProperties = {
 
 export default function MarketingAssets() {
   return (
-    <div className={`mk-scroll ${bungeeFont.variable} ${spaceFont.variable} ${monoFont.variable}`}>
+    <div className={`fixed inset-0 overflow-auto bg-[#070d18] ${bungeeFont.variable} ${spaceFont.variable} ${monoFont.variable}`}>
       <section
         style={{
           display: "flex",

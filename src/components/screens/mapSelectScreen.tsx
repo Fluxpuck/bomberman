@@ -80,7 +80,7 @@ export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
             style={{ paddingBlock: 10 }}
             onClick={() => onSelect("random")}
           >
-            <span className="text-lg font-bold text-[var(--ui-yellow)]">?</span>
+            <span className="text-lg font-bold text-ui-yellow">?</span>
             <span className="font-bold text-sm">Random Preset</span>
           </Button>
 
@@ -90,7 +90,7 @@ export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
             style={{ paddingBlock: 10 }}
             onClick={() => onSelect("generate")}
           >
-            <span className="text-lg font-bold text-[var(--ui-yellow)]">⚄</span>
+            <span className="text-lg font-bold text-ui-yellow">⚄</span>
             <span className="font-bold text-sm">Generate Random Map</span>
           </Button>
         </div>

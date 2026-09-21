@@ -1,4 +1,5 @@
 import { PlayerStats } from "../../game/hooks/tracker";
+import { cx, Dot, Label, PANEL_GLASS, ROW } from "../ui";
 
 type CornerPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -34,7 +35,11 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
 
   return (
     <div
-      className={`ui-panel ui-panel--glass fixed portrait:static overflow-hidden z-40 w-32 sm:w-48 portrait:w-full !p-0 ${getPositionClasses()}`}
+      className={cx(
+        PANEL_GLASS,
+        "rounded-xl fixed portrait:static overflow-hidden z-40 w-32 sm:w-48 portrait:w-full",
+        getPositionClasses()
+      )}
       style={{
         borderColor: player.color,
         opacity: isAlive ? 1 : 0.75,
@@ -48,12 +53,12 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
         {/* Player name */}
         <div className="flex justify-between items-center sm:mb-2 portrait:mb-0">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="ui-dot !w-3 !h-3" style={{ backgroundColor: player.color }} />
+            <Dot color={player.color} />
             <span className="font-bold text-sm truncate">{displayName}</span>
             {player.latencyMs !== null && (
-              <span className="ui-label !text-[10px] !tracking-normal">
+              <Label className="!text-[10px] !tracking-normal">
                 {player.latencyMs} ms
-              </span>
+              </Label>
             )}
           </div>
         </div>
@@ -62,14 +67,14 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
             HUDs compact) */}
         {isAlive ? (
           <div className="hidden sm:block portrait:hidden">
-            <div className="ui-row !py-0.5">
+            <div className={cx(ROW, "py-0.5")}>
               <span>Score</span>
               <span>{player.score}</span>
             </div>
 
-            <div className="ui-row !py-0.5">
+            <div className={cx(ROW, "py-0.5")}>
               <span>Lives</span>
-              <span className="flex gap-0.5 !font-sans !text-red-500">
+              <span className="flex gap-0.5 !font-sans !text-[#ef4444]">
                 {[...Array(player.lives)].map((_, i) => (
                   <span key={i} aria-hidden>
                     ♥
@@ -78,21 +83,21 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
               </span>
             </div>
 
-            <div className="ui-row !py-0.5">
+            <div className={cx(ROW, "py-0.5")}>
               <span>Bombs</span>
               <span>
                 {player.bombsAvailable - (player.activeBombs || 0)}
-                <span className="!text-[var(--ui-muted)]"> / {player.bombsAvailable}</span>
+                <span className="!text-ui-muted"> / {player.bombsAvailable}</span>
               </span>
             </div>
 
-            <div className="ui-row !py-0.5">
+            <div className={cx(ROW, "py-0.5")}>
               <span>Range</span>
               <span>{player.bombRange}</span>
             </div>
 
             {player.kills > 0 && (
-              <div className="ui-row !py-0.5">
+              <div className={cx(ROW, "py-0.5")}>
                 <span>Kills</span>
                 <span>{player.kills}</span>
               </div>
@@ -100,9 +105,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
           </div>
         ) : (
           <div className="text-center py-1">
-            <span className="ui-label !text-[var(--ui-danger)] !tracking-[0.2em]">
-              Eliminated
-            </span>
+            <Label className="!text-ui-danger !tracking-[0.2em]">Eliminated</Label>
           </div>
         )}
       </div>

@@ -1,7 +1,0 @@
-/* The game's body is overflow:hidden; the marketing sheet is a scrolling canvas. */
-.mk-scroll {
-  position: fixed;
-  inset: 0;
-  overflow: auto;
-  background: #070d18;
-}
