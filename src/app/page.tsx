@@ -475,6 +475,13 @@ export default function Home() {
     setIsSpectator(false);
   };
 
+  // Inside Discord the relay is reached through the /ws URL mapping — a
+  // connect failure there almost always means the mapping is missing or
+  // points at a host Discord can't reach.
+  const relayConnectError = isDiscordActivity()
+    ? "Could not connect to the server — is the /ws URL mapping set?"
+    : "Could not connect to the server";
+
   const handleCreateRoom = async (name: string) => {
     setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
     // A creator is never a guest or spectator — clear stale flags a failed
@@ -489,7 +496,7 @@ export default function Home() {
       setLobbyState((prev) => ({
         ...prev,
         connecting: false,
-        error: "Could not connect to the server",
+        error: relayConnectError,
       }));
     }
   };
@@ -506,7 +513,7 @@ export default function Home() {
       setLobbyState((prev) => ({
         ...prev,
         connecting: false,
-        error: "Could not connect to the server",
+        error: relayConnectError,
       }));
       setIsGuest(false);
       setGameMode("solo");
@@ -525,7 +532,7 @@ export default function Home() {
       setLobbyState((prev) => ({
         ...prev,
         connecting: false,
-        error: "Could not connect to the server",
+        error: relayConnectError,
       }));
       setIsGuest(false);
       setIsSpectator(false);

@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { getDiscordSdk, isDiscordActivity } from "../../discord/client";
+import {
+  getDiscordSdk,
+  initDiscordClient,
+  isDiscordActivity,
+} from "../../discord/client";
 import { DISCORD_CONFIG, NET_CONFIG } from "../../game/core/config";
 import { RoomPlayer, RoomSpectator } from "../../types/multiplayer";
 import {
@@ -61,6 +65,7 @@ export function LobbyScreen({
   const [joinCode, setJoinCode] = useState(initialJoinCode);
   const [fillBots, setFillBots] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const inRoom = roomCode !== null;
   // Spectators count as participants so a host can start a match for an
@@ -80,15 +85,24 @@ export function LobbyScreen({
   };
 
   const handleShareInvite = async () => {
-    const sdk = getDiscordSdk();
-    if (!sdk || !roomCode) return;
+    if (!roomCode) return;
+    setShareError(null);
+    // The SDK only exists after OAuth completes — and stays null if init
+    // failed. Retry init on click so one transient failure doesn't
+    // permanently kill the button.
+    const sdk = getDiscordSdk() ?? (await initDiscordClient());
+    if (!sdk) {
+      setShareError("Discord isn't connected — see the console for details.");
+      return;
+    }
     try {
       await sdk.commands.shareLink({
         message: DISCORD_CONFIG.shareMessage,
         custom_id: `${DISCORD_CONFIG.roomCodePrefix}${roomCode}`,
       });
-    } catch {
-      // Invite sharing is best-effort.
+    } catch (error) {
+      console.error("[discord] shareLink failed:", error);
+      setShareError("Couldn't open the Discord share dialog.");
     }
   };
 
@@ -181,9 +195,12 @@ export function LobbyScreen({
 
             {/* Discord invite — only shown inside the Activity */}
             {isDiscordActivity() && (
-              <Button block variant="discord" onClick={handleShareInvite}>
-                Share invite on Discord
-              </Button>
+              <>
+                <Button block variant="discord" onClick={handleShareInvite}>
+                  Share invite on Discord
+                </Button>
+                {shareError && <ErrorText>{shareError}</ErrorText>}
+              </>
             )}
 
             {/* Player list */}

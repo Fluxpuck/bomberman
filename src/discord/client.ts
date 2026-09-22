@@ -3,18 +3,15 @@
 // =========================
 // Lazily initializes the SDK only when the game is running inside Discord's
 // Activity iframe (detected via the `frame_id` query param Discord injects
-// into the iframe URL). Handles OAuth authorization and patches WebSocket so
-// the multiplayer relay is routed through Discord's URL-mapping proxy.
+// into the iframe URL). Handles OAuth authorization. The multiplayer relay
+// is not routed through here — roomClient dials the proxied /ws path on the
+// activity origin directly (see relayWsUrl in net/roomClient.ts).
 //
 // The SDK is imported dynamically so it never loads — and the handshake never
 // runs — in a plain browser tab. Every export is safe to call anywhere.
 
 import type { DiscordSDK } from "@discord/embedded-app-sdk";
-import {
-  DISCORD_CONFIG,
-  getDiscordClientId,
-  getServerUrl,
-} from "../game/core/config";
+import { DISCORD_CONFIG, getDiscordClientId } from "../game/core/config";
 
 let sdk: DiscordSDK | null = null;
 let initPromise: Promise<DiscordSDK | null> | null = null;
@@ -78,12 +75,15 @@ export function initDiscordClient(): Promise<DiscordSDK | null> {
   if (!isDiscordActivity()) return Promise.resolve(null);
 
   const clientId = getDiscordClientId();
-  if (!clientId) return Promise.resolve(null);
+  if (!clientId) {
+    console.warn(
+      "[discord] NEXT_PUBLIC_DISCORD_CLIENT_ID is not set — Discord features disabled"
+    );
+    return Promise.resolve(null);
+  }
 
   initPromise = (async () => {
-    const { DiscordSDK: SDK, patchUrlMappings } = await import(
-      "@discord/embedded-app-sdk"
-    );
+    const { DiscordSDK: SDK } = await import("@discord/embedded-app-sdk");
 
     const instance = new SDK(clientId);
     await instance.ready();
@@ -100,19 +100,6 @@ export function initDiscordClient(): Promise<DiscordSDK | null> {
         onActivityJoinRoom?.(code);
       })
       .catch(() => {});
-
-    // Route the relay WebSocket through Discord's URL-mapping proxy —
-    // external connections from the iframe must go via /.proxy. The target
-    // is a host (no scheme), matching the portal's /ws mapping.
-    patchUrlMappings(
-      [
-        {
-          prefix: DISCORD_CONFIG.wsProxyPrefix,
-          target: new URL(getServerUrl()).host,
-        },
-      ],
-      { patchWebSocket: true, patchFetch: false, patchXhr: false }
-    );
 
     const { code } = await instance.commands.authorize({
       client_id: clientId,
@@ -139,7 +126,11 @@ export function initDiscordClient(): Promise<DiscordSDK | null> {
 
     sdk = instance;
     return sdk;
-  })().catch(() => {
+  })().catch((error) => {
+    // The SDK stays null and every Discord feature silently dies without
+    // this — surface the real failure (bad client id, token-exchange 500,
+    // rejected authorize) in the activity console.
+    console.error("[discord] init failed:", error);
     initPromise = null;
     return null;
   });

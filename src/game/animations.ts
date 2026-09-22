@@ -227,21 +227,24 @@ export function predictBlastCells(
 // Public API
 // =========================
 /**
- * Places a dynamite in a cell and explodes after fuse
+ * Places a dynamite in a cell and explodes after fuse.
+ * Returns false when the cell rejects the bomb (off-grid or already
+ * solid — e.g. a bomb is already there) so callers don't count a
+ * placement that never armed.
  */
 export function armDynamite(
   grid: HTMLElement,
   at: GridPosition,
   opts?: ArmDynamiteOpts
-) {
+): boolean {
   // Get the cell at the given position
   const cell = getCell(grid, at.row, at.col);
-  if (!cell) return;
+  if (!cell) return false;
 
   // Can't place inside walls/solids (allow placing on open tiles only)
   // Exception: allow placing on barrels (destructible blocks)
   const here = getCellFlags(grid, at.row, at.col);
-  if (here.solid && !here.barrel) return;
+  if (here.solid && !here.barrel) return false;
 
   // Get the fuse duration
   const fuse = Math.max(0, opts?.fuseMs ?? BOMB_CONFIG.fuseDuration);
@@ -289,7 +292,7 @@ export function armDynamite(
   // the remaining time on unpause.
   if (fusesPaused) {
     bombState.pausedRemainingMs = fuse;
-    return;
+    return true;
   }
 
   // After the fuse expires, explode the dynamite
@@ -297,6 +300,7 @@ export function armDynamite(
 
   // Store the timer ID for potential cancellation
   bombTimers.set(bombId, timerId);
+  return true;
 }
 
 /**

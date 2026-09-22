@@ -203,8 +203,12 @@ the `frame_id` query param Discord injects into the iframe URL
 
 1. Enable **Activities**, add a placeholder OAuth2 redirect URI (`https://127.0.0.1`).
 2. **URL Mappings**: `/` → the public app URL, `/ws` → the public relay host.
-   The `/ws` prefix is `DISCORD_CONFIG.wsProxyPrefix`; `patchUrlMappings` in
-   `client.ts` rewrites `new WebSocket(getServerUrl())` to the proxied path.
+   The `/ws` prefix is `DISCORD_CONFIG.wsProxyPrefix`; inside the sandbox
+   (`*.discordsays.com`) `relayWsUrl()` in `net/roomClient.ts` dials
+   `wss://<activity-host>/ws` directly — scheme must be `wss` with an
+   implicit port, and `NEXT_PUBLIC_WS_URL` is ignored there. Under an
+   "Application URL Override" the origin isn't discordsays.com, so the
+   configured server URL is dialed directly instead.
 3. Dev workflow needs tunnels: `cloudflared tunnel --url http://localhost:3000`
    for the app and a second tunnel for the relay (`yarn ws` on :3001), then
    point the mappings at the tunnel hosts. The relay must be publicly
@@ -214,7 +218,7 @@ the `frame_id` query param Discord injects into the iframe URL
 
 | Module | Responsibility |
 | --- | --- |
-| `src/discord/client.ts` | Detection, SDK init, OAuth (`identify` + `rpc.activities.write`), ws proxy patching, invite `customId` + `ACTIVITY_JOIN` room-code handling, Discord display name |
+| `src/discord/client.ts` | Detection, SDK init, OAuth (`identify` + `rpc.activities.write`), invite `customId` + `ACTIVITY_JOIN` room-code handling, Discord display name |
 | `src/discord/presence.ts` | `updatePresence(gameState, ctx)` — maps game state to `setActivity` payloads (party size, elapsed timer, winner, join secret while in a lobby) |
 | `src/app/api/token/route.ts` | OAuth code → access token exchange |
 

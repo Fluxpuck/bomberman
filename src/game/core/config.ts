@@ -86,8 +86,9 @@ export const DISCORD_CONFIG = {
   // unlocks setActivity(); identify is required for authenticate().
   oauthScopes: ["identify", "rpc.activities.write"],
   // URL-mapping prefix configured in the dev portal that proxies to the
-  // relay server. patchUrlMappings rewrites relay WebSocket connections to
-  // /.proxy<wsProxyPrefix> when running inside Discord.
+  // relay server. Inside the Discord sandbox the client dials
+  // wss://<activity-host><wsProxyPrefix> directly — see relayWsUrl in
+  // net/roomClient.ts.
   wsProxyPrefix: "/ws",
   // Presence art served from public/ as an external URL (portal-uploaded
   // asset keys would also work, but external URLs need no portal setup).

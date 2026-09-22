@@ -1,7 +1,49 @@
 // Sound manager for the game
 
+// Local storage key for the sound-effects mute preference
+const SFX_MUTE_STORAGE_KEY = "bomb-blast-arena-sfx-muted";
+
 // Cache for audio elements to avoid creating multiple instances
 const audioCache: Record<string, HTMLAudioElement> = {};
+
+// Cached mute flag for sound effects. Stays null until the first read so
+// the persisted preference is loaded lazily on the client.
+let soundMuted: boolean | null = null;
+
+/**
+ * Whether sound effects are muted. The preference is persisted in
+ * localStorage and read lazily, so this is safe to call on the server.
+ */
+export function isSoundMuted(): boolean {
+  if (soundMuted !== null) return soundMuted;
+  if (typeof window === "undefined") return false;
+  try {
+    soundMuted = localStorage.getItem(SFX_MUTE_STORAGE_KEY) === "true";
+  } catch {
+    soundMuted = false;
+  }
+  return soundMuted;
+}
+
+/**
+ * Mute or unmute all sound effects. Muting also pauses every cached sound
+ * that is currently playing. The choice is persisted in localStorage.
+ * @param muted Whether sound effects should be muted
+ */
+export function setSoundMuted(muted: boolean): void {
+  soundMuted = muted;
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(SFX_MUTE_STORAGE_KEY, muted.toString());
+  } catch (error) {
+    console.error("Error saving sound mute state to localStorage:", error);
+  }
+
+  if (muted) {
+    Object.values(audioCache).forEach((audio) => audio.pause());
+  }
+}
 
 /**
  * Play a sound effect
@@ -17,6 +59,7 @@ export function playSound(
   loop: boolean = false
 ): HTMLAudioElement | undefined {
   if (typeof window === "undefined") return undefined;
+  if (isSoundMuted()) return undefined;
 
   try {
     // Check if we already have this sound cached

@@ -1,3 +1,4 @@
+import { isDiscordActivity } from "../../discord/client";
 import {
   ClientToServerMessage,
   GamePayload,
@@ -5,7 +6,7 @@ import {
   RoomSpectator,
   ServerToClientMessage,
 } from "../../types/multiplayer";
-import { getServerUrl } from "../core/config";
+import { DISCORD_CONFIG, getServerUrl } from "../core/config";
 
 // =========================
 // Room client (singleton)
@@ -13,6 +14,26 @@ import { getServerUrl } from "../core/config";
 // Thin wrapper around a WebSocket connection to the relay server. Handles
 // the connection-management protocol (create/join/spectate/leave/lock/relay)
 // and exposes event setters the UI and host/guest layers subscribe to.
+
+/**
+ * The URL the WebSocket should dial. Inside Discord's sandboxed iframe
+ * (*.discordsays.com) external sockets are CSP-blocked, so the connection
+ * must go through the activity's own origin via the /ws URL mapping —
+ * always wss:// with an implicit port or it never reaches the proxy. The
+ * portal's /ws mapping decides where the traffic lands, so the configured
+ * server URL doesn't apply there. Under a dev "Application URL Override"
+ * the origin isn't discordsays.com; dial the configured server directly.
+ */
+function relayWsUrl(): string {
+  if (
+    typeof window !== "undefined" &&
+    isDiscordActivity() &&
+    window.location.host.endsWith(".discordsays.com")
+  ) {
+    return `wss://${window.location.host}${DISCORD_CONFIG.wsProxyPrefix}`;
+  }
+  return getServerUrl();
+}
 
 type RoomHandler = (
   code: string,
@@ -89,7 +110,7 @@ class RoomClient {
     }
 
     const connectAttempt = new Promise<void>((resolve, reject) => {
-      const url = getServerUrl();
+      const url = relayWsUrl();
       const ws = new WebSocket(url);
       this.ws = ws;
 

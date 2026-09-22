@@ -228,18 +228,14 @@ export function placeBomb(character: Character): boolean {
     return false;
   }
 
-  // Increment active bombs counter
-  playerTracker.incrementActiveBombs();
-  lastBombTimeByPlayer[character.id] = now;
-
-  // Play bomb placement sound
-  playSound("soundFX", "dropping-bomb", 0.5);
-
   // Create a copy of the grid position to ensure the bomb stays where it was placed
   const bombPosition = { ...character.gridPosition };
 
-  // Place the bomb on the grid
-  armDynamite(grid, bombPosition, {
+  // Place the bomb on the grid. armDynamite rejects cells that already hold
+  // a bomb (e.g. the character is still standing on one they just placed);
+  // counting those here would leak an active-bomb slot that no explosion
+  // ever releases.
+  const armed = armDynamite(grid, bombPosition, {
     bombRange: playerTracker.bombRange,
     ownerId: character.id,
     onDetonate: (cells, duration, ownerId) => {
@@ -279,6 +275,17 @@ export function placeBomb(character: Character): boolean {
       }
     },
   });
+
+  if (!armed) {
+    return false;
+  }
+
+  // Increment active bombs counter only once the bomb is actually armed
+  playerTracker.incrementActiveBombs();
+  lastBombTimeByPlayer[character.id] = now;
+
+  // Play bomb placement sound
+  playSound("soundFX", "dropping-bomb", 0.5);
 
   return true;
 }
