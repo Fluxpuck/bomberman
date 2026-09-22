@@ -80,7 +80,7 @@ export default function TermsOfService() {
       <h2 className={h2}>9. Contact</h2>
       <p className={p}>
         Questions about these terms can be sent to{" "}
-        <span className="text-ui-text">[your contact email]</span>.
+        <span className="text-ui-text">bomb-blast-arena@gmail.com</span>.
       </p>
     </>
   );

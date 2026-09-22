@@ -6,7 +6,7 @@ import type {
 } from "react";
 
 /**
- * Shared UI kit. Everything is Tailwind: tokens live in tailwind.config.js
+ * Shared UI kit. Everything is Tailwind: tokens live in `src/app/globals.css` under `@theme`
  * (`ui-*` colors, font families, sprite keyframes) and every screen composes
  * the primitives and class constants below, so buttons, panels and type look
  * and behave the same everywhere.
@@ -107,7 +107,7 @@ export function Panel({
   return (
     <div
       className={cx(
-        "m-auto w-full p-7 text-ui-text rounded-[18px] border-2 border-ui-line bg-gradient-to-b from-ui-panel-top to-ui-panel-bottom shadow-[0_24px_60px_rgba(0,0,0,.55),inset_0_1px_0_rgba(255,255,255,.07)]",
+        "m-auto w-full p-7 text-ui-text rounded-[18px] border-2 border-ui-line bg-linear-to-b from-ui-panel-top to-ui-panel-bottom shadow-[0_24px_60px_rgba(0,0,0,.55),inset_0_1px_0_rgba(255,255,255,.07)]",
         className
       )}
       style={{ maxWidth: width } as CSSProperties}
@@ -176,7 +176,7 @@ export function ProgressBar({ percent, color }: { percent: number; color: string
 /* ----------------------------------------------------------------- Forms */
 
 export const INPUT_BASE =
-  "font-[inherit] text-ui-text bg-ui-ink border-2 border-ui-line rounded-[10px] transition-[border-color,box-shadow] duration-[120ms] placeholder:text-[rgba(143,166,201,.55)] focus:outline-none focus:border-ui-cyan focus:shadow-[0_0_0_3px_rgba(95,215,242,.25)]";
+  "font-[inherit] text-ui-text bg-ui-ink border-2 border-ui-line rounded-[10px] transition-[border-color,box-shadow] duration-[120ms] placeholder:text-[rgba(143,166,201,.55)] focus:outline-hidden focus:border-ui-cyan focus:shadow-[0_0_0_3px_rgba(95,215,242,.25)]";
 
 export function TextInput({
   className,
@@ -208,7 +208,7 @@ export function Range({
     <input
       type="range"
       className={cx(
-        "appearance-none h-1.5 rounded-[3px] bg-[rgba(124,196,255,.25)] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-4",
+        "appearance-none h-1.5 rounded-[3px] bg-[rgba(124,196,255,.25)] cursor-pointer focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-4",
         "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-ui-yellow [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-ui-orange-deep",
         "[&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-ui-yellow [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-ui-orange-deep",
         className
@@ -265,7 +265,7 @@ const BUTTON_BASE = [
   "text-[length:var(--btn-fs)] text-[color:var(--btn-fg)] bg-[color:var(--btn-bg)]",
   // raised edge
   "border-solid border-[length:var(--bw)] border-[color:var(--btn-border)] border-b-[length:calc(var(--bw)_+_var(--depth))]",
-  "translate-y-[var(--lift)] outline outline-4 outline-transparent outline-offset-0",
+  "translate-y-[var(--lift)] outline-4 outline-transparent outline-offset-0",
   "shadow-[0_calc(var(--depth)_+_4px)_14px_rgba(0,0,0,.45),inset_0_3px_0_rgba(255,255,255,.28)]",
   "transition-[transform,box-shadow,filter,outline-color] duration-[120ms] ease-out",
   // hover
@@ -331,7 +331,7 @@ export function LinkButton({
     <button
       type={type}
       className={cx(
-        "text-sm text-ui-muted rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors duration-[120ms] hover:text-white hover:bg-[rgba(124,196,255,.14)] focus-visible:text-white focus-visible:bg-[rgba(124,196,255,.14)] focus-visible:outline-none",
+        "text-sm text-ui-muted rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors duration-[120ms] hover:text-white hover:bg-[rgba(124,196,255,.14)] focus-visible:text-white focus-visible:bg-[rgba(124,196,255,.14)] focus-visible:outline-hidden",
         className
       )}
       {...rest}
@@ -341,4 +341,4 @@ export function LinkButton({
 
 /** Touch d-pad key. */
 export const PAD =
-  "flex items-center justify-center w-12 h-12 text-lg font-bold text-ui-text bg-[rgba(10,17,32,.72)] border-2 border-[rgba(124,196,255,.32)] rounded-xl backdrop-blur-sm transition-[transform,background-color] duration-[60ms] select-none touch-none active:scale-[.93] active:bg-ui-yellow active:text-ui-ink active:border-ui-orange-deep";
+  "flex items-center justify-center w-12 h-12 text-lg font-bold text-ui-text bg-[rgba(10,17,32,.72)] border-2 border-[rgba(124,196,255,.32)] rounded-xl backdrop-blur-xs transition-[transform,background-color] duration-[60ms] select-none touch-none active:scale-[.93] active:bg-ui-yellow active:text-ui-ink active:border-ui-orange-deep";

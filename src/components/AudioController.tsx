@@ -27,7 +27,7 @@ export function AudioController({ autoPlay = true }: AudioControllerProps) {
         type="button"
         onClick={toggleMute}
         aria-label={isMuted ? "Unmute music" : "Mute music"}
-        className="text-xl rounded-full transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-4"
+        className="text-xl rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-4"
       >
         {isMuted ? "🔇" : "🔊"}
       </button>
@@ -42,7 +42,7 @@ export function AudioController({ autoPlay = true }: AudioControllerProps) {
         className="hidden sm:block w-24"
       />
 
-      <Label className="hidden sm:block !tracking-normal w-9 text-right">
+      <Label className="hidden sm:block tracking-normal! w-9 text-right">
         {Math.round(volume * 100)}%
       </Label>
     </div>

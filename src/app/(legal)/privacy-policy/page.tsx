@@ -93,7 +93,7 @@ export default function PrivacyPolicy() {
       <h2 className={h2}>8. Contact</h2>
       <p className={p}>
         Questions about this policy can be sent to{" "}
-        <span className="text-ui-text">[your contact email]</span>.
+        <span className="text-ui-text">bomb-blast-arena@gmail.com</span>.
       </p>
     </>
   );

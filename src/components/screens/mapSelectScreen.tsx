@@ -76,7 +76,7 @@ export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
 
           <Button
             variant="card"
-            className="col-span-2 !flex-row"
+            className="col-span-2 flex-row!"
             style={{ paddingBlock: 10 }}
             onClick={() => onSelect("random")}
           >
@@ -86,7 +86,7 @@ export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
 
           <Button
             variant="card"
-            className="col-span-2 !flex-row"
+            className="col-span-2 flex-row!"
             style={{ paddingBlock: 10 }}
             onClick={() => onSelect("generate")}
           >

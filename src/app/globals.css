@@ -1,3 +1,84 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #e8d5b7;
+  --color-dark: #4a4238;
+  --color-accent: #8b7355;
+  --color-light: #f5ebe0;
+  --color-green: #7a9b76;
+  --color-red: #b85c5c;
+  --color-blue: #6b8cae;
+  --color-yellow: #d4a574;
+  /* Bomb Blast Arena UI kit (see src/components/ui.tsx) */
+  --color-ui-ink: #0a1120;
+  --color-ui-panel-top: #16233f;
+  --color-ui-panel-bottom: #0c1526;
+  --color-ui-line: rgba(124, 196, 255, 0.24);
+  --color-ui-text: #e8f0fb;
+  --color-ui-muted: #8fa6c9;
+  --color-ui-yellow: #ffce3d;
+  --color-ui-orange-deep: #a8410c;
+  --color-ui-cyan: #5fd7f2;
+  --color-ui-danger: #ff6b6b;
+
+  /* Fonts are loaded with next/font in src/app/layout.tsx. */
+  --font-sans: var(--font-space), "Space Grotesk", Helvetica, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", "Courier New", monospace;
+  --font-display: var(--font-bungee), Bungee, sans-serif;
+  --font-pixel: "Courier New", Courier, monospace;
+
+  /* Sprite animations (src/components/sprites.tsx). The same keyframes are
+     also injected at runtime by the game asset modules, which need them even
+     when no animate-* utility is on the page. */
+  --animate-bomb-tick: bombTick 0.7s ease-in-out infinite;
+  --animate-bomb-spark: bombSpark 0.5s ease-in-out infinite;
+  --animate-bomb-shock: bombShock 1.1s ease-out infinite;
+  --animate-blast-flicker: blastFlicker 0.28s ease-in-out infinite;
+  --animate-pu-hover: puHover 2.2s ease-in-out infinite;
+  --animate-pu-pulse: puPulse 2s ease-in-out infinite;
+  --animate-pu-spark: puSpark 1s ease-in-out infinite;
+  --animate-bomber-bob: bomberBob 2.4s ease-in-out infinite;
+  --animate-bomber-step: bomberStep 0.42s ease-in-out infinite;
+  --animate-bomber-glow: bomberGlow 2.2s ease-in-out infinite;
+
+  @keyframes bombTick {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+  }
+  @keyframes bombSpark {
+    0%, 100% { opacity: 0.5; transform: scale(0.75) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.3) rotate(25deg); }
+  }
+  @keyframes bombShock {
+    0% { opacity: 0.7; transform: scale(0.6); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+  @keyframes blastFlicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.78; }
+  }
+  @keyframes puHover {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @keyframes puPulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.92); }
+    50% { opacity: 0.75; transform: scale(1.06); }
+  }
+  @keyframes puSpark {
+    0%, 100% { opacity: 0.5; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.25); }
+  }
+  @keyframes bomberBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes bomberStep {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-3px) rotate(2deg); }
+  }
+  @keyframes bomberGlow {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+}

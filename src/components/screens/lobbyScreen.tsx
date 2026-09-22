@@ -140,7 +140,7 @@ export function LobbyScreen({
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="CODE"
                 aria-label="Room code"
-                className="flex-1 min-w-0 !w-auto text-center !text-xl uppercase tracking-[0.3em] font-bold"
+                className="flex-1 min-w-0 w-auto! text-center text-xl! uppercase tracking-[0.3em] font-bold"
               />
               <Button
                 variant="green"
@@ -199,7 +199,7 @@ export function LobbyScreen({
                       <Dot color={SLOT_COLORS[p.slot % SLOT_COLORS.length]} />
                       {p.name}
                       {p.isHost && (
-                        <Label className="!text-ui-yellow">Host</Label>
+                        <Label className="text-ui-yellow!">Host</Label>
                       )}
                     </span>
                     <Label>Slot {p.slot + 1}</Label>

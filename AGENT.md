@@ -23,7 +23,7 @@ There is **no test framework** configured. There are no unit/integration/e2e tes
 ## Tech Stack
 
 - **Next.js 16.3.5** (App Router, Turbopack) + **React 19.2** + **TypeScript 5.5** (strict mode)
-- **Tailwind CSS 3.4** for UI styling; game elements use inline styles
+- **Tailwind CSS 4** (CSS-first config in `src/app/globals.css`, no `tailwind.config.js`) for UI styling; game elements use inline styles
 - Path alias: `@/*` maps to `./src/*` (see `tsconfig.json`)
 - ESLint config: `next/core-web-vitals` flat config (see `eslint.config.mjs`)
 

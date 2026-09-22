@@ -56,7 +56,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
             <Dot color={player.color} />
             <span className="font-bold text-sm truncate">{displayName}</span>
             {player.latencyMs !== null && (
-              <Label className="!text-[10px] !tracking-normal">
+              <Label className="text-[10px]! tracking-normal!">
                 {player.latencyMs} ms
               </Label>
             )}
@@ -74,7 +74,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
 
             <div className={cx(ROW, "py-0.5")}>
               <span>Lives</span>
-              <span className="flex gap-0.5 !font-sans !text-[#ef4444]">
+              <span className="flex gap-0.5 font-sans! text-[#ef4444]!">
                 {[...Array(player.lives)].map((_, i) => (
                   <span key={i} aria-hidden>
                     ♥
@@ -87,7 +87,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
               <span>Bombs</span>
               <span>
                 {player.bombsAvailable - (player.activeBombs || 0)}
-                <span className="!text-ui-muted"> / {player.bombsAvailable}</span>
+                <span className="text-ui-muted!"> / {player.bombsAvailable}</span>
               </span>
             </div>
 
@@ -105,7 +105,7 @@ export function PlayerHUD({ player, corner }: PlayerHUDProps) {
           </div>
         ) : (
           <div className="text-center py-1">
-            <Label className="!text-ui-danger !tracking-[0.2em]">Eliminated</Label>
+            <Label className="text-ui-danger! tracking-[0.2em]!">Eliminated</Label>
           </div>
         )}
       </div>
