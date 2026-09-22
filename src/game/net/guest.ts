@@ -41,8 +41,11 @@ import { roomClient } from "./roomClient";
 // the host's start payload, create local Player instances so the renderer
 // (game.tsx) works unchanged, and apply each incoming snapshot to mirror
 // the host's authoritative state. Keyboard input is sent to the host.
+// Spectators use the same view in spectator mode: identical rendering, but
+// no keyboard listener and no input sent to the host.
 
 let active = false;
+let spectatorMode = false;
 let myPlayerId: string | null = null;
 let nextInputSequence = 0;
 let pendingMoves: Array<{ sequence: number; direction: Direction }> = [];
@@ -76,7 +79,7 @@ function sendGuestInput(move?: Direction): void {
 
 /** Queue one movement for the local guest (touch control tap/hold). */
 export function sendGuestMove(direction: Direction): void {
-  if (!active) return;
+  if (!active || spectatorMode) return;
   const sequence = nextInputSequence + 1;
   pendingMoves.push({ sequence, direction });
   predictMove(direction);
@@ -88,7 +91,7 @@ export function sendGuestMove(direction: Direction): void {
  * to false afterwards or the host's edge-triggered placement never re-arms.
  */
 export function sendGuestBomb(): void {
-  if (!active) return;
+  if (!active || spectatorMode) return;
   guestInput.bomb = true;
   sendGuestInput();
   window.setTimeout(() => {
@@ -119,12 +122,14 @@ function gridToPixel(pos: GridPosition): Position {
 /**
  * Build the local grid and create local Player instances for every human
  * roster entry, so game.tsx's render loop renders all characters. Called when
- * the guest receives the host's `start` payload.
+ * the guest receives the host's `start` payload. In spectator mode no input
+ * is captured or sent — the view is watch-only.
  */
-export function startGuestView(payload: StartPayload) {
+export function startGuestView(payload: StartPayload, spectator = false) {
   if (typeof document === "undefined") return;
 
   active = true;
+  spectatorMode = spectator;
   latestGameOver = null;
   previousLives.clear();
   previousBombByIndex.clear();
@@ -168,8 +173,9 @@ export function startGuestView(payload: StartPayload) {
     myPlayerId = myEntry?.id ?? null;
   }
 
-  // Capture keyboard input and send it to the host.
-  removeKeyboardListener = setupKeyboardInput();
+  // Capture keyboard input and send it to the host. Spectators never send
+  // input, so they get no listener at all.
+  removeKeyboardListener = spectator ? null : setupKeyboardInput();
 }
 
 function predictMove(direction: Direction): void {
@@ -420,6 +426,7 @@ export function getMyPlayerId(): string | null {
  */
 export function stopGuestView() {
   active = false;
+  spectatorMode = false;
   if (removeKeyboardListener) {
     removeKeyboardListener();
     removeKeyboardListener = null;

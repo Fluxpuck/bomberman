@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getDiscordSdk, isDiscordActivity } from "../../discord/client";
-import { DISCORD_CONFIG } from "../../game/core/config";
-import { RoomPlayer } from "../../types/multiplayer";
+import { DISCORD_CONFIG, NET_CONFIG } from "../../game/core/config";
+import { RoomPlayer, RoomSpectator } from "../../types/multiplayer";
 import {
   Button,
   Checkbox,
@@ -22,12 +22,16 @@ interface LobbyScreenProps {
   /** Pre-fills the join box — set when launched from a Discord invite. */
   initialJoinCode?: string;
   players: RoomPlayer[];
+  spectators: RoomSpectator[];
   isHost: boolean;
+  /** True when this client joined as a spectator (watch-only). */
+  isSpectator: boolean;
   myName: string;
   error: string | null;
   connecting: boolean;
   onCreate: (name: string) => void;
   onJoin: (code: string, name: string) => void;
+  onSpectate: (code: string, name: string) => void;
   onLeave: () => void;
   onStart: (fillBots: boolean) => void;
   onBack: () => void;
@@ -40,12 +44,15 @@ export function LobbyScreen({
   roomCode,
   initialJoinCode = "",
   players,
+  spectators,
   isHost,
+  isSpectator,
   myName,
   error,
   connecting,
   onCreate,
   onJoin,
+  onSpectate,
   onLeave,
   onStart,
   onBack,
@@ -56,7 +63,9 @@ export function LobbyScreen({
   const [copied, setCopied] = useState(false);
 
   const inRoom = roomCode !== null;
-  const participantCount = players.length;
+  // Spectators count as participants so a host can start a match for an
+  // audience (e.g. host + bots) without a second player.
+  const participantCount = players.length + spectators.length;
   const canStart = isHost && participantCount >= 2;
 
   const handleCopyCode = async () => {
@@ -140,6 +149,13 @@ export function LobbyScreen({
               >
                 Join
               </Button>
+              <Button
+                variant="blue"
+                disabled={!name.trim() || joinCode.length !== 4 || connecting}
+                onClick={() => onSpectate(joinCode, name.trim())}
+              >
+                Watch
+              </Button>
             </div>
           </div>
         )}
@@ -172,7 +188,7 @@ export function LobbyScreen({
 
             {/* Player list */}
             <div>
-              <Label className="block mb-2">Players ({participantCount}/4)</Label>
+              <Label className="block mb-2">Players ({players.length}/4)</Label>
               <div className="flex flex-col gap-2">
                 {players.map((p) => (
                   <div
@@ -191,6 +207,29 @@ export function LobbyScreen({
                 ))}
               </div>
             </div>
+
+            {/* Spectator list */}
+            {spectators.length > 0 && (
+              <div>
+                <Label className="block mb-2">
+                  Spectators ({spectators.length}/{NET_CONFIG.maxSpectators})
+                </Label>
+                <div className="flex flex-col gap-2">
+                  {spectators.map((s, i) => (
+                    <div
+                      key={`${s.name}-${i}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.04] border border-[rgba(124,196,255,.14)]"
+                    >
+                      <span className="flex items-center gap-2 font-bold">
+                        <Dot color="#94a3b8" />
+                        {s.name}
+                      </span>
+                      <Label>Watching</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Host controls */}
             {isHost ? (
@@ -217,7 +256,11 @@ export function LobbyScreen({
               </div>
             ) : (
               <div className="flex flex-col gap-3 text-center">
-                <p className="text-ui-muted">Waiting for host to start…</p>
+                <p className="text-ui-muted">
+                  {isSpectator
+                    ? "Spectating — waiting for host to start…"
+                    : "Waiting for host to start…"}
+                </p>
                 <Button block variant="red" size="sm" onClick={onLeave}>
                   Leave Room
                 </Button>

@@ -20,6 +20,8 @@ export interface PresenceContext {
   matchStartMs: number;
   /** Winner's display name, shown on the end screens. */
   winnerName?: string;
+  /** True when watching an online match without a player slot. */
+  spectating?: boolean;
 }
 
 /** Subset of the setActivity activity partial we populate. */
@@ -30,6 +32,8 @@ interface ActivityPresence {
   timestamps?: { start?: number } | null;
   assets?: { large_image?: string | null; large_text?: string | null } | null;
   party?: { id?: string | null; size?: number[] | null } | null;
+  instance?: boolean | null;
+  secrets?: { join?: string } | null;
 }
 
 function modeLabel(gameMode: GameMode): string {
@@ -61,6 +65,15 @@ function buildActivity(
         size: [Math.max(ctx.playerCount, 1), DISCORD_CONFIG.maxPartySize],
       }
     : null;
+  // instance + secrets.join let Discord render a "Join" button on the
+  // presence; joiners get the room code via ACTIVITY_JOIN. In a locked
+  // (in-progress) room the join falls back to spectating — see page.tsx.
+  const joinable = ctx.roomCode
+    ? {
+        instance: true,
+        secrets: { join: `${DISCORD_CONFIG.roomCodePrefix}${ctx.roomCode}` },
+      }
+    : {};
 
   switch (state) {
     case GameState.LOBBY:
@@ -71,15 +84,17 @@ function buildActivity(
             state: `Room ${ctx.roomCode}`,
             assets,
             party,
+            ...joinable,
           }
         : { type: 0, details: "In the menu", state: "Multiplayer lobby", assets };
     case GameState.PLAYING:
       return {
         type: 0,
         details: modeLabel(ctx.gameMode),
-        state: "In a match",
+        state: ctx.spectating ? "Spectating" : "In a match",
         assets,
         party,
+        ...joinable,
         timestamps,
       };
     case GameState.PAUSED:

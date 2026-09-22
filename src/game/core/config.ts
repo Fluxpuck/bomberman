@@ -53,6 +53,9 @@ export const PLAYER_PALETTE = [
 // the browser bundle).
 export const NET_CONFIG = {
   defaultServerUrl: "ws://localhost:3001",
+  // How many spectators (watch-only, no slot) a room accepts on top of the
+  // 4 player slots. Mirrored by MAX_SPECTATORS_PER_ROOM in ws-server.js.
+  maxSpectators: 8,
   // How often the host broadcasts a full state snapshot to guests.
   snapshotIntervalMs: 50,
   // Repeat guest input while keys are held. This recovers from missed

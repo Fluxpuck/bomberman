@@ -2,6 +2,7 @@ import {
   ClientToServerMessage,
   GamePayload,
   RoomPlayer,
+  RoomSpectator,
   ServerToClientMessage,
 } from "../../types/multiplayer";
 import { getServerUrl } from "../core/config";
@@ -10,14 +11,19 @@ import { getServerUrl } from "../core/config";
 // Room client (singleton)
 // =========================
 // Thin wrapper around a WebSocket connection to the relay server. Handles
-// the connection-management protocol (create/join/leave/lock/relay) and
-// exposes event setters the UI and host/guest layers subscribe to.
+// the connection-management protocol (create/join/spectate/leave/lock/relay)
+// and exposes event setters the UI and host/guest layers subscribe to.
 
-type RoomHandler = (code: string, players: RoomPlayer[]) => void;
+type RoomHandler = (
+  code: string,
+  players: RoomPlayer[],
+  spectators: RoomSpectator[]
+) => void;
 type RelayHandler = (from: number, payload: GamePayload) => void;
 type ErrorHandler = (message: string) => void;
 type HostLeftHandler = () => void;
 type ReadyHandler = () => void;
+type SpectatorJoinedHandler = () => void;
 
 class RoomClient {
   private static instance: RoomClient;
@@ -25,12 +31,14 @@ class RoomClient {
   private code: string | null = null;
   private slot: number | null = null;
   private name: string = "";
+  private spectator = false;
 
   private onReady: ReadyHandler | null = null;
   private onRoom: RoomHandler | null = null;
   private onRelay: RelayHandler | null = null;
   private onError: ErrorHandler | null = null;
   private onHostLeft: HostLeftHandler | null = null;
+  private onSpectatorJoined: SpectatorJoinedHandler | null = null;
 
   private constructor() {}
 
@@ -58,6 +66,9 @@ class RoomClient {
   }
   public setOnHostLeft(handler: HostLeftHandler | null) {
     this.onHostLeft = handler;
+  }
+  public setOnSpectatorJoined(handler: SpectatorJoinedHandler | null) {
+    this.onSpectatorJoined = handler;
   }
 
   // =========================
@@ -113,16 +124,23 @@ class RoomClient {
       case "created":
         this.code = msg.code;
         this.slot = msg.slot;
+        this.spectator = false;
         this.onRoom?.(msg.code, [
           { slot: msg.slot, name: this.name, isHost: true },
-        ]);
+        ], []);
         break;
       case "joined":
         this.code = msg.code;
         this.slot = msg.slot;
+        this.spectator = false;
+        break;
+      case "spectating":
+        this.code = msg.code;
+        this.slot = null;
+        this.spectator = true;
         break;
       case "room":
-        this.onRoom?.(msg.code, msg.players);
+        this.onRoom?.(msg.code, msg.players, msg.spectators ?? []);
         break;
       case "error":
         this.onError?.(msg.message);
@@ -130,6 +148,9 @@ class RoomClient {
       case "hostLeft":
         this.onHostLeft?.();
         this.reset();
+        break;
+      case "spectatorJoined":
+        this.onSpectatorJoined?.();
         break;
       case "relay":
         this.onRelay?.(msg.from, msg.payload);
@@ -156,6 +177,12 @@ class RoomClient {
     this.send({ t: "join", code, name });
   }
 
+  /** Join a room as a spectator: receives host broadcasts, sends nothing. */
+  public spectateRoom(code: string, name: string) {
+    this.name = name;
+    this.send({ t: "spectate", code, name });
+  }
+
   public leaveRoom() {
     this.send({ t: "leave" });
     this.reset();
@@ -167,6 +194,8 @@ class RoomClient {
 
   /** Send a game payload to the host (guest -> host). */
   public sendToHost(payload: GamePayload) {
+    // Spectators are receive-only; the relay would drop this anyway.
+    if (this.spectator) return;
     this.send({ t: "relay", to: "host", payload });
   }
 
@@ -187,11 +216,15 @@ class RoomClient {
   public getName(): string {
     return this.name;
   }
+  public isSpectator(): boolean {
+    return this.spectator;
+  }
 
   /** Close the connection and clear local state. */
   public reset() {
     this.code = null;
     this.slot = null;
+    this.spectator = false;
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.close();

@@ -11,9 +11,11 @@ import { PlayersHUD } from "../components/screens/playerHud";
 import { StartScreen } from "../components/screens/startScreen";
 import { TouchControls } from "../components/touchControls";
 import {
+  getDiscordUserName,
   getLaunchRoomCode,
   initDiscordClient,
   isDiscordActivity,
+  setOnActivityJoinRoom,
 } from "../discord/client";
 import { updatePresence } from "../discord/presence";
 import { GAME_CONFIG } from "../game/core/config";
@@ -57,7 +59,12 @@ import {
 } from "../game/net/host";
 import { roomClient } from "../game/net/roomClient";
 import { Direction, GameMode, GameState } from "../types/game";
-import { GamePayload, RoomPlayer, RosterEntry } from "../types/multiplayer";
+import {
+  GamePayload,
+  RoomPlayer,
+  RoomSpectator,
+  RosterEntry,
+} from "../types/multiplayer";
 import Game from "./game";
 
 export default function Home() {
@@ -71,6 +78,7 @@ export default function Home() {
   const [lobbyState, setLobbyState] = useState<{
     code: string | null;
     players: RoomPlayer[];
+    spectators: RoomSpectator[];
     isHost: boolean;
     error: string | null;
     connecting: boolean;
@@ -78,6 +86,7 @@ export default function Home() {
   }>({
     code: null,
     players: [],
+    spectators: [],
     isHost: false,
     error: null,
     connecting: false,
@@ -86,6 +95,8 @@ export default function Home() {
 
   // True when this client is an online guest (joined someone else's room).
   const [isGuest, setIsGuest] = useState(false);
+  // True when this client spectates: receives host state but sends no input.
+  const [isSpectator, setIsSpectator] = useState(false);
 
   // The host's roster, kept in a ref so the PLAYING effect and relay handler
   // can read it without re-subscribing.
@@ -103,6 +114,9 @@ export default function Home() {
   const [discordReady, setDiscordReady] = useState(false);
   // Wall-clock match start for the presence elapsed timer.
   const matchStartMsRef = useRef(0);
+  // Authenticated Discord display name — the default lobby nickname and the
+  // identity used when auto-joining a room from a Discord invite/Join.
+  const discordNameRef = useRef<string | null>(null);
 
   // =========================
   // Relay dispatch (kept in a ref so the roomClient callback always calls
@@ -112,13 +126,39 @@ export default function Home() {
   const handleRelayRef = useRef<(from: number, payload: GamePayload) => void>(
     () => {}
   );
+  const handleSpectatorJoinedRef = useRef<() => void>(() => {});
+  // Pending Discord auto-join — lets a "Room is full" / "Game already
+  // started" rejection fall back to spectating instead of dead-ending.
+  const pendingDiscordJoinRef = useRef<{ code: string; name: string } | null>(
+    null
+  );
+  const discordJoinErrorRef = useRef<(message: string) => void>(() => {});
+  discordJoinErrorRef.current = (message) => {
+    const pending = pendingDiscordJoinRef.current;
+    pendingDiscordJoinRef.current = null;
+    if (
+      !pending ||
+      (message !== "Room is full" && message !== "Game already started")
+    ) {
+      return;
+    }
+    roomClient.reset();
+    handleSpectateRoom(pending.code, pending.name);
+  };
 
   const handleRelay = (from: number, payload: GamePayload) => {
     if (isGuest) {
       // Guest receives host payloads.
       if (payload.t === "start") {
-        startGuestView(payload);
-        setGameState(GameState.PLAYING);
+        // The host re-broadcasts start when a spectator joins a locked room;
+        // ignore the duplicate once this view is already in the match.
+        if (
+          gameState !== GameState.PLAYING &&
+          gameState !== GameState.PAUSED
+        ) {
+          startGuestView(payload, isSpectator);
+          setGameState(GameState.PLAYING);
+        }
       } else if (payload.t === "gameOver") {
         handleHostPayload(payload);
         setGameState(payload.state === "WIN" ? GameState.WIN : GameState.GAME_OVER);
@@ -132,11 +172,24 @@ export default function Home() {
   };
   handleRelayRef.current = handleRelay;
 
+  // A spectator joined a locked room (host only): re-send the start payload
+  // so they can build the grid, and the game-over payload if the match has
+  // already ended. In-game guests ignore the duplicate start.
+  const handleSpectatorJoined = () => {
+    if (rosterRef.current.length === 0) return;
+    sendStart(rosterRef.current);
+    if (gameState === GameState.GAME_OVER || gameState === GameState.WIN) {
+      sendGameOver(gameState, winner?.id);
+    }
+  };
+  handleSpectatorJoinedRef.current = handleSpectatorJoined;
+
   // =========================
   // Room client event wiring
   // =========================
   useEffect(() => {
-    roomClient.setOnRoom((code, players) => {
+    roomClient.setOnRoom((code, players, spectators) => {
+      pendingDiscordJoinRef.current = null;
       // Mid-game guest disconnect (host only): eliminate the departed remote
       // player so they don't linger as a frozen character. rosterRef is only
       // populated on the host, so this block never runs on guests.
@@ -159,6 +212,7 @@ export default function Home() {
         ...prev,
         code,
         players,
+        spectators,
         isHost: me?.isHost ?? false,
         myName: me?.name ?? prev.myName,
         error: null,
@@ -168,17 +222,20 @@ export default function Home() {
 
     roomClient.setOnError((message) => {
       setLobbyState((prev) => ({ ...prev, error: message, connecting: false }));
+      discordJoinErrorRef.current(message);
     });
 
     roomClient.setOnHostLeft(() => {
       // If we were mid-game, stop the guest view and return to the start.
       stopGuestView();
       setIsGuest(false);
+      setIsSpectator(false);
       setGameState(GameState.START);
       setLobbyState((prev) => ({
         ...prev,
         code: null,
         players: [],
+        spectators: [],
         isHost: false,
         error: "Host left the game",
         connecting: false,
@@ -189,14 +246,42 @@ export default function Home() {
       handleRelayRef.current(from, payload);
     });
 
+    roomClient.setOnSpectatorJoined(() => {
+      handleSpectatorJoinedRef.current();
+    });
+
     return () => {
       roomClient.setOnRoom(null);
       roomClient.setOnError(null);
       roomClient.setOnHostLeft(null);
       roomClient.setOnRelay(null);
+      roomClient.setOnSpectatorJoined(null);
     };
      
   }, []);
+
+  // Route a Discord-provided room code (shareLink launch or the presence
+  // "Join" button) into the lobby: auto-join with the Discord name when we
+  // have one, otherwise just pre-fill the join box. Never interrupts a
+  // live match.
+  const joinFromDiscordRef = useRef<(code: string) => void>(() => {});
+  joinFromDiscordRef.current = (code) => {
+    if (
+      gameState === GameState.PLAYING ||
+      gameState === GameState.PAUSED
+    ) {
+      return;
+    }
+    setGameState(GameState.LOBBY);
+    const name = discordNameRef.current;
+    if (name) {
+      if (lobbyState.code) roomClient.reset(); // leave any current room
+      pendingDiscordJoinRef.current = { code, name };
+      handleJoinRoom(code, name);
+    } else {
+      setInviteJoinCode(code);
+    }
+  };
 
   // =========================
   // Discord Activity init + invite deep-link
@@ -206,11 +291,12 @@ export default function Home() {
     initDiscordClient().then((sdk) => {
       if (!sdk) return;
       setDiscordReady(true);
+      const name = getDiscordUserName();
+      // Lobby nicknames are capped at 16 chars (lobby input maxLength).
+      discordNameRef.current = name ? name.slice(0, 16) : null;
+      setOnActivityJoinRoom((code) => joinFromDiscordRef.current(code));
       const code = getLaunchRoomCode();
-      if (code) {
-        setInviteJoinCode(code);
-        setGameState(GameState.LOBBY);
-      }
+      if (code) joinFromDiscordRef.current(code);
     });
   }, []);
 
@@ -243,6 +329,9 @@ export default function Home() {
     matchStartMsRef.current = Date.now();
 
     if (gameMode === "online" && isGuest) {
+      // Back-date the presence timer by the host's clock so a mid-game
+      // spectator doesn't get a fresh "elapsed" timer.
+      matchStartMsRef.current = Date.now() - getLatestTimeElapsedMs();
       // Guest: no engine to start. The guest view was already started by the
       // relay handler. Just poll the latest snapshot for the HUD/time.
       const timeInterval = setInterval(() => {
@@ -315,7 +404,10 @@ export default function Home() {
       roomCode: lobbyState.code,
       playerCount: lobbyState.players.length,
       matchStartMs: inMatch ? matchStartMsRef.current : 0,
-      winnerName: winner?.name,
+      // Guests/spectators get the winner via the host's gameOver payload,
+      // not the engine callbacks that set `winner`.
+      winnerName: winner?.name ?? getLatestGameOver()?.winner?.name,
+      spectating: isSpectator,
     });
   }, [
     gameState,
@@ -324,6 +416,7 @@ export default function Home() {
     lobbyState.players.length,
     winner,
     discordReady,
+    isSpectator,
   ]);
 
   // =========================
@@ -372,16 +465,23 @@ export default function Home() {
     setLobbyState({
       code: null,
       players: [],
+      spectators: [],
       isHost: false,
       error: null,
       connecting: false,
-      myName: "",
+      myName: discordNameRef.current ?? "",
     });
     setIsGuest(false);
+    setIsSpectator(false);
   };
 
   const handleCreateRoom = async (name: string) => {
     setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
+    // A creator is never a guest or spectator — clear stale flags a failed
+    // join/spectate may have left, or the next match would wait for a host
+    // start payload that never comes.
+    setIsGuest(false);
+    setIsSpectator(false);
     try {
       await roomClient.connect();
       roomClient.createRoom(name);
@@ -397,6 +497,7 @@ export default function Home() {
   const handleJoinRoom = async (code: string, name: string) => {
     setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
     setIsGuest(true);
+    setIsSpectator(false);
     setGameMode("online");
     try {
       await roomClient.connect();
@@ -412,16 +513,38 @@ export default function Home() {
     }
   };
 
+  const handleSpectateRoom = async (code: string, name: string) => {
+    setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
+    setIsGuest(true);
+    setIsSpectator(true);
+    setGameMode("online");
+    try {
+      await roomClient.connect();
+      roomClient.spectateRoom(code, name);
+    } catch {
+      setLobbyState((prev) => ({
+        ...prev,
+        connecting: false,
+        error: "Could not connect to the server",
+      }));
+      setIsGuest(false);
+      setIsSpectator(false);
+      setGameMode("solo");
+    }
+  };
+
   const handleLeaveRoom = () => {
     roomClient.leaveRoom();
     setIsGuest(false);
+    setIsSpectator(false);
     setLobbyState({
       code: null,
       players: [],
+      spectators: [],
       isHost: false,
       error: null,
       connecting: false,
-      myName: "",
+      myName: discordNameRef.current ?? "",
     });
   };
 
@@ -429,14 +552,16 @@ export default function Home() {
     roomClient.reset();
     stopGuestView();
     setIsGuest(false);
+    setIsSpectator(false);
     setGameState(GameState.START);
     setLobbyState({
       code: null,
       players: [],
+      spectators: [],
       isHost: false,
       error: null,
       connecting: false,
-      myName: "",
+      myName: discordNameRef.current ?? "",
     });
   };
 
@@ -526,7 +651,19 @@ export default function Home() {
       stopGuestView();
       stopHosting();
       setIsGuest(false);
+      setIsSpectator(false);
     }
+    // Clear the room from lobby state too — otherwise the stale code/players
+    // would leak a phantom party into the next game's rich presence.
+    setLobbyState({
+      code: null,
+      players: [],
+      spectators: [],
+      isHost: false,
+      error: null,
+      connecting: false,
+      myName: discordNameRef.current ?? "",
+    });
     setGameState(GameState.START);
     setTimeElapsedMs(0);
     setWinner(undefined);
@@ -563,10 +700,12 @@ export default function Home() {
     return tracker.getPlayers().map((player) => player.getStats());
   };
 
-  // The end screen only shows the local player's own stats.
+  // The end screen only shows the local player's own stats. Spectators have
+  // no character of their own, so they see everyone's stats instead.
   const getOwnStats = (): PlayerStats[] => {
     const all = getPlayerStats();
     if (gameMode === "online" && isGuest) {
+      if (isSpectator) return all;
       const myId = getMyPlayerId();
       return all.filter((player) => player.id === myId);
     }
@@ -649,8 +788,9 @@ export default function Home() {
         {(gameState === GameState.PLAYING ||
           gameState === GameState.PAUSED) && <Game />}
 
-        {/* Touch Controls - only rendered on touch-capable devices */}
-        {gameState === GameState.PLAYING && (
+        {/* Touch Controls - only rendered on touch-capable devices;
+            spectators have no character to steer. */}
+        {gameState === GameState.PLAYING && !isSpectator && (
           <TouchControls onMove={handleTouchMove} onBomb={handleTouchBomb} />
         )}
 
@@ -672,13 +812,16 @@ export default function Home() {
           <LobbyScreen
             roomCode={lobbyState.code}
             players={lobbyState.players}
+            spectators={lobbyState.spectators}
             isHost={lobbyState.isHost}
+            isSpectator={isSpectator}
             myName={lobbyState.myName}
             error={lobbyState.error}
             connecting={lobbyState.connecting}
             initialJoinCode={inviteJoinCode}
             onCreate={handleCreateRoom}
             onJoin={handleJoinRoom}
+            onSpectate={handleSpectateRoom}
             onLeave={handleLeaveRoom}
             onStart={handleStartOnlineGame}
             onBack={handleLobbyBack}

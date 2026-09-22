@@ -21,6 +21,11 @@ export interface RoomPlayer {
   isHost: boolean;
 }
 
+/** A spectator in a room. Spectators watch the game but take no slot. */
+export interface RoomSpectator {
+  name: string;
+}
+
 /** How a slot in the local roster is controlled. */
 export type ControlKind = "local" | "remote" | "computer";
 
@@ -39,6 +44,7 @@ export interface RosterEntry {
 export type ClientToServerMessage =
   | { t: "create"; name: string }
   | { t: "join"; code: string; name: string }
+  | { t: "spectate"; code: string; name: string }
   | { t: "leave" }
   | { t: "lock" }
   | { t: "relay"; to: "host" | "guests"; payload: GamePayload };
@@ -46,9 +52,12 @@ export type ClientToServerMessage =
 export type ServerToClientMessage =
   | { t: "created"; code: string; slot: number }
   | { t: "joined"; code: string; slot: number }
-  | { t: "room"; code: string; players: RoomPlayer[] }
+  | { t: "spectating"; code: string }
+  | { t: "room"; code: string; players: RoomPlayer[]; spectators: RoomSpectator[] }
   | { t: "error"; message: string }
   | { t: "hostLeft" }
+  /** Sent to the host when a spectator joins a locked (in-progress) room. */
+  | { t: "spectatorJoined" }
   | { t: "relay"; from: number; payload: GamePayload };
 
 // =========================

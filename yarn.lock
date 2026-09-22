@@ -1532,6 +1532,7 @@ __metadata:
     autoprefixer: "npm:^10.4.19"
     eslint: "npm:^9"
     eslint-config-next: "npm:16.3.5"
+    html-to-image: "npm:^1.11.13"
     next: "npm:16.3.5"
     postcss: "npm:^8.4.40"
     react: "npm:19.2.0"
@@ -2794,6 +2795,13 @@ __metadata:
   dependencies:
     hermes-estree: "npm:0.25.1"
   checksum: 10c0/3abaa4c6f1bcc25273f267297a89a4904963ea29af19b8e4f6eabe04f1c2c7e9abd7bfc4730ddb1d58f2ea04b6fee74053d8bddb5656ec6ebf6c79cc8d14202c
+  languageName: node
+  linkType: hard
+
+"html-to-image@npm:^1.11.13":
+  version: 1.11.13
+  resolution: "html-to-image@npm:1.11.13"
+  checksum: 10c0/03bd7192d87b99499e37ff12a8e2b41ddce4cf8e33a93dfadff18df0f213434c7f1ba8328db2158f4805da07b7aec3c90aec3152908281153217e86784218b10
   languageName: node
   linkType: hard
 

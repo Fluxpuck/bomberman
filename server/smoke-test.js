@@ -18,12 +18,19 @@ function queued(ws) {
   return {
     recv(timeoutMs = 2000) {
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("recv timeout")), timeoutMs);
+        const waiter = { resolve: (m) => { clearTimeout(timer); resolve(m); } };
+        const timer = setTimeout(() => {
+          // A timed-out waiter must be removed, or it would swallow the next
+          // message by resolving an already-rejected promise.
+          const i = waiters.indexOf(waiter);
+          if (i >= 0) waiters.splice(i, 1);
+          reject(new Error("recv timeout"));
+        }, timeoutMs);
         if (queue.length > 0) {
           clearTimeout(timer);
           resolve(queue.shift());
         } else {
-          waiters.push({ resolve: (m) => { clearTimeout(timer); resolve(m); } });
+          waiters.push(waiter);
         }
       });
     },
@@ -59,6 +66,7 @@ async function run() {
 
   const hostRoom = await hostQ.recv();
   assert(hostRoom.t === "room" && hostRoom.players.length === 1, "host gets room with 1 player");
+  assert(Array.isArray(hostRoom.spectators) && hostRoom.spectators.length === 0, "room broadcast includes empty spectators list");
 
   // --- Join room ---
   const guest = new WebSocket(WS_URL);
@@ -74,17 +82,44 @@ async function run() {
   assert(guestRoom.t === "room" && guestRoom.players.length === 2, "guest sees 2 players");
   assert(hostRoom2.t === "room" && hostRoom2.players.length === 2, "host sees 2 players");
 
+  // --- Spectate: watch-only member ---
+  const spectator = new WebSocket(WS_URL);
+  await new Promise((r) => (spectator.onopen = r));
+  const specQ = queued(spectator);
+  send(spectator, { t: "spectate", code, name: "Eve" });
+  const spectating = await specQ.recv();
+  assert(spectating.t === "spectating" && spectating.code === code, "spectator receives 'spectating'");
+
+  // Everyone gets a room update including the spectators list.
+  const specRoom = await specQ.recv();
+  const hostRoom3 = await hostQ.recv();
+  await guestQ.recv(); // guest's room broadcast
+  assert(specRoom.t === "room" && specRoom.spectators.length === 1 && specRoom.spectators[0].name === "Eve", "spectator sees room with spectators list");
+  assert(hostRoom3.t === "room" && hostRoom3.spectators.length === 1, "host sees spectator in room broadcast");
+
   // --- Relay: guest -> host (input) ---
   send(guest, { t: "relay", to: "host", payload: { t: "input", up: true } });
   const hostRelay = await hostQ.recv();
   assert(hostRelay.t === "relay" && hostRelay.from === 1 && hostRelay.payload.up === true, "host receives guest input relay");
 
-  // --- Relay: host -> guests (snapshot) ---
+  // --- Relay: host -> guests (snapshot) also reaches spectators ---
   send(host, { t: "relay", to: "guests", payload: { t: "snapshot", characters: [] } });
   const guestRelay = await guestQ.recv();
   assert(guestRelay.t === "relay" && guestRelay.payload.t === "snapshot", "guest receives host snapshot relay");
+  const specRelay = await specQ.recv();
+  assert(specRelay.t === "relay" && specRelay.payload.t === "snapshot", "spectator receives host snapshot relay");
 
-  // --- Lock room: new joins rejected ---
+  // --- Spectator -> host relay is dropped (receive-only) ---
+  send(spectator, { t: "relay", to: "host", payload: { t: "input", up: true } });
+  let spectatorRelayDropped = false;
+  try {
+    await hostQ.recv(300);
+  } catch {
+    spectatorRelayDropped = true;
+  }
+  assert(spectatorRelayDropped, "spectator input relay is dropped");
+
+  // --- Lock room: new player joins rejected ---
   send(host, { t: "lock" });
   await new Promise((r) => setTimeout(r, 100));
   const lateJoiner = new WebSocket(WS_URL);
@@ -95,12 +130,37 @@ async function run() {
   assert(lateJoinResp.t === "error" && lateJoinResp.message.includes("started"), "locked room rejects new joins");
   lateJoiner.close();
 
-  // --- Host leaves: guests get hostLeft ---
+  // --- Spectators can still join a locked room; host is pinged to re-send start ---
+  const lateSpec = new WebSocket(WS_URL);
+  await new Promise((r) => (lateSpec.onopen = r));
+  const lateSpecQ = queued(lateSpec);
+  send(lateSpec, { t: "spectate", code, name: "Frank" });
+  const lateSpectating = await lateSpecQ.recv();
+  assert(lateSpectating.t === "spectating", "locked room still accepts spectators");
+  await lateSpecQ.recv(); // lateSpec's room broadcast
+  await guestQ.recv(); // guest's room broadcast
+  await specQ.recv(); // first spectator's room broadcast
+  const hostRoom4 = await hostQ.recv();
+  assert(hostRoom4.t === "room" && hostRoom4.spectators.length === 2, "host sees 2 spectators");
+  const hostSpecPing = await hostQ.recv();
+  assert(hostSpecPing.t === "spectatorJoined", "host gets spectatorJoined for late spectator");
+
+  // --- Host leaves: guests and spectators get hostLeft ---
   host.close();
   const guestHostLeft = await guestQ.recv();
   assert(guestHostLeft.t === "hostLeft", "guest receives hostLeft when host disconnects");
+  const specHostLeft = await specQ.recv();
+  assert(specHostLeft.t === "hostLeft", "spectator receives hostLeft when host disconnects");
+  const lateSpecHostLeft = await lateSpecQ.recv();
+  assert(lateSpecHostLeft.t === "hostLeft", "late spectator receives hostLeft when host disconnects");
 
   guest.close();
+  spectator.close();
+  lateSpec.close();
+
+  // Let in-flight socket closes settle before exiting — exiting mid-close
+  // trips a libuv assertion on Windows.
+  await new Promise((r) => setTimeout(r, 300));
 
   console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} TEST(S) FAILED`);
   process.exit(failures === 0 ? 0 : 1);

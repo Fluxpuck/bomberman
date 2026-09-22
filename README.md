@@ -1,8 +1,49 @@
-# Bomb Blast Arena 💣
+<div align="center">
+  <img src="public/marketing/bomb-blast-arena-banner-1280x640.png" alt="Bomb Blast Arena" width="760" />
 
-A fun project and modern take on a classic grid-based bomber game with NPC opponents and online multiplayer.
+  <br />
 
-## Quick Start
+  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white" alt="Next.js 16" />
+  <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-3.4-38BDF8?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
+
+  <h3>A lo-fi love letter to the classic grid-bomber — right in your browser.</h3>
+</div>
+
+Drop bombs, blast barrels, grab power-ups, and be the last bot standing.
+Play solo against up to three AI opponents, or take the chaos online with
+friends through rooms, invite links, or a Discord Activity.
+
+## ✨ Features
+
+- 💣 **Classic bombing action** — destructible barrels, chain reactions, and timed fuses
+- 🤖 **Smart AI opponents** — BFS-pathfinding bots that hunt, flee danger, and grab loot
+- 🌐 **Online multiplayer** — host-authoritative matches over a tiny WebSocket relay, with 4-letter room codes and spectator support
+- 💬 **Discord Activity** — rich presence, share-link invites, and join-from-Discord flow
+- 🎁 **Power-ups** — extra bombs, bigger blasts, and more hidden in the rubble
+- ⏱️ **Timed mode** — outscore the arena before the clock runs out
+
+## 🎮 How to Play
+
+<div align="center">
+  <img src="public/marketing/bomb-blast-arena-title-1920x1080.png" alt="Bomb Blast Arena title screen" width="600" />
+</div>
+
+Pick a mode — **Solo**, **2–4 Players**, or **Multiplayer (Online)** — and
+outlast everyone else in the arena.
+
+| Action        | Keys                    |
+| ------------- | ----------------------- |
+| Move          | `WASD` or `Arrow Keys`  |
+| Place bomb    | `Spacebar`              |
+| Pause/Resume  | `Escape` (offline only) |
+
+**Power-ups** hide under destroyed barrels: extra bombs, increased blast
+range, and more.
+
+## 🚀 Quick Start
 
 Requirements: Node.js 26 and Yarn 4.
 
@@ -15,7 +56,11 @@ yarn dev
 
 Visit `http://localhost:3000` and start playing!
 
-## Online Multiplayer
+## 🌐 Online Multiplayer
+
+<div align="center">
+  <img src="public/marketing/bomb-blast-arena-capsule-460x215.png" alt="Bomb Blast Arena" width="360" />
+</div>
 
 Online multiplayer uses a separate WebSocket relay server. Start it in a
 second terminal:
@@ -43,26 +88,15 @@ browsers can still heavily throttle fully backgrounded tabs. Keep the host
 window running for reliable matches. A future server-authoritative simulation
 would remove this browser limitation. Pause is disabled in online games.
 
-## How to Play
+## 🛠️ Built With
 
-**Controls**
+- **Next.js 16** (App Router, Turbopack) + **React 19**
+- **TypeScript** in strict mode
+- **Tailwind CSS** for UI — the game itself is rendered with an imperative,
+  `requestAnimationFrame`-driven DOM engine in `src/game/`
+- **ws** for the multiplayer relay (`server/ws-server.js`)
+- **Discord Embedded App SDK** for the Activity integration
 
-- Move: `WASD` or `Arrow Keys`
-- Bomb: `Spacebar`
+## 📄 License
 
-**Power-ups**
-
-- Extra bombs
-- Increased blast range
-
-**Objective**: Outlast up to 3 AI opponents by strategically placing bombs and destroying obstacles.
-
-## Built With
-
-- Next.js 16+ with Turbopack
-- TypeScript
-- Tailwind CSS
-
-## License
-
-MIT - Use freely and have fun!
+MIT — use freely and have fun!

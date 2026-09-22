@@ -18,7 +18,7 @@ export default function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-ui-ink text-ui-text font-sans">
+    <main className="h-screen overflow-y-auto bg-ui-ink text-ui-text font-sans">
       <div className="mx-auto max-w-2xl px-6 py-16">
         {children}
         <div className="mt-12">

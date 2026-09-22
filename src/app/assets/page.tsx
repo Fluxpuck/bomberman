@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Bungee, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import type { CSSProperties, ReactNode } from "react";
 import {
   Bomb,
@@ -11,16 +10,16 @@ import {
   type PowerupKind,
   type TileKind,
 } from "../../components/sprites";
+import { DownloadPng } from "./downloadButton";
+import { FitWidth } from "./fitWidth";
 
 export const metadata: Metadata = {
-  title: "Bomb Blast Arena — marketing kit",
+  title: "Bomb Blast Arena — asset kit",
   robots: { index: false },
 };
 
-const bungeeFont = Bungee({ weight: "400", subsets: ["latin"], variable: "--font-bungee" });
-const spaceFont = Space_Grotesk({ weight: ["500", "700"], subsets: ["latin"], variable: "--font-space" });
-const monoFont = JetBrains_Mono({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-mono" });
-
+// Font variables (--font-bungee / --font-space / --font-mono) come from the
+// vendored next/font/local fonts in the root layout.
 const BUNGEE = "var(--font-bungee), 'Bungee', sans-serif";
 const MONO = "var(--font-mono), 'JetBrains Mono', monospace";
 const SPACE = "var(--font-space), 'Space Grotesk', Helvetica, sans-serif";
@@ -41,10 +40,25 @@ const label: CSSProperties = {
 };
 const caption: CSSProperties = { fontFamily: MONO, fontSize: 11, color: "#7f9bc4" };
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
+type Asset = { id: string; name: string; label: string };
+
+function Block({
+  title,
+  assets,
+  children,
+}: {
+  title: string;
+  assets?: Asset[];
+  children: ReactNode;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={label}>{title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={label}>{title}</div>
+        {assets?.map((a) => (
+          <DownloadPng key={a.id} targetId={a.id} name={a.name} label={a.label} />
+        ))}
+      </div>
       {children}
     </div>
   );
@@ -70,12 +84,14 @@ function Guy({
 
 /** Icon-sized bomb clipped inside a rounded ground. */
 function BombIcon({
+  id,
   size,
   radius,
   offset,
   scale,
   background,
 }: {
+  id?: string;
   size: number;
   radius: number;
   offset: [number, number];
@@ -84,6 +100,7 @@ function BombIcon({
 }) {
   return (
     <div
+      id={id}
       style={{
         position: "relative",
         width: size,
@@ -160,15 +177,14 @@ const modeButton: CSSProperties = {
 
 export default function MarketingAssets() {
   return (
-    <div className={`fixed inset-0 overflow-auto bg-[#070d18] ${bungeeFont.variable} ${spaceFont.variable} ${monoFont.variable}`}>
+    <div className="fixed inset-0 overflow-auto bg-[#070d18]">
       <section
         style={{
           display: "flex",
           flexDirection: "column",
           gap: 38,
           padding: 48,
-          width: "max-content",
-          minWidth: "100%",
+          width: "100%",
           fontFamily: SPACE,
           color: "#e8f0fb",
           background: "radial-gradient(120% 80% at 50% 0%,#16294a 0%,#070d18 72%)",
@@ -190,20 +206,29 @@ export default function MarketingAssets() {
             4a
           </span>
           <h1 style={{ margin: 0, fontSize: 34, fontWeight: 700, letterSpacing: "-.01em" }}>
-            Bomb Blast Arena — marketing kit
+            Bomb Blast Arena — asset kit
           </h1>
           <p style={{ margin: 0, fontFamily: MONO, fontSize: 13, color: "#7f9bc4" }}>
-            artboards at export size · built from the game&apos;s own sprites
+            artboards at export size · built from the game&apos;s own sprites · click a ↓ button to download a PNG
           </p>
         </div>
 
         {/* 01 LOGO */}
-        <Block title="01 · LOGO LOCKUP">
+        <Block
+          title="01 · LOGO LOCKUP"
+          assets={[
+            { id: "asset-logo-dark", name: "bomb-blast-arena-logo-dark", label: "dark 760×300" },
+            { id: "asset-logo-light", name: "bomb-blast-arena-logo-light", label: "light card" },
+            { id: "asset-logo-line", name: "bomb-blast-arena-logo-line", label: "one-line" },
+          ]}
+        >
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" }}>
-            <div
-              style={{
-                width: 760,
-                height: 300,
+            <FitWidth w={760} h={300}>
+              <div
+                id="asset-logo-dark"
+                style={{
+                  width: 760,
+                  height: 300,
                 boxSizing: "border-box",
                 flex: "0 0 auto",
                 position: "relative",
@@ -279,10 +304,13 @@ export default function MarketingAssets() {
                   </div>
                 </div>
               </div>
-            </div>
+              </div>
+            </FitWidth>
 
+            <FitWidth w={360} h={300}>
             <div style={{ width: 360, height: 300, flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
               <div
+                id="asset-logo-light"
                 style={{
                   flex: 1,
                   borderRadius: 14,
@@ -315,6 +343,7 @@ export default function MarketingAssets() {
                 </div>
               </div>
               <div
+                id="asset-logo-line"
                 style={{
                   flex: 1,
                   borderRadius: 14,
@@ -330,13 +359,19 @@ export default function MarketingAssets() {
                 </div>
               </div>
               <div style={caption}>light ground · single-line horizontal</div>
-            </div>
+              </div>
+            </FitWidth>
           </div>
         </Block>
 
         {/* 02 BANNER */}
-        <Block title="02 · SOCIAL BANNER · 1280×640">
+        <Block
+          title="02 · SOCIAL BANNER · 1280×640"
+          assets={[{ id: "asset-banner", name: "bomb-blast-arena-banner-1280x640", label: "1280×640" }]}
+        >
+          <FitWidth w={1280} h={640}>
           <div
+            id="asset-banner"
             style={{
               width: 1280,
               height: 640,
@@ -458,11 +493,17 @@ export default function MarketingAssets() {
               ))}
             </div>
           </div>
+          </FitWidth>
         </Block>
 
         {/* 03 TITLE SCREEN */}
-        <Block title="03 · TITLE / BACK SCREEN · 1920×1080 · over the game's own background.jpg">
+        <Block
+          title="03 · TITLE / BACK SCREEN · 1920×1080 · over the game's own background.jpg"
+          assets={[{ id: "asset-title", name: "bomb-blast-arena-title-1920x1080", label: "1920×1080" }]}
+        >
+          <FitWidth w={1920} h={1080}>
           <div
+            id="asset-title"
             style={{
               width: 1920,
               height: 1080,
@@ -632,17 +673,29 @@ export default function MarketingAssets() {
               <Bomb state="ticking" scale={1.5} />
             </Abs>
           </div>
+          </FitWidth>
         </Block>
 
         {/* 04 ICONS + CAPSULE */}
-        <Block title="04 · APP ICON · 180 / 96 / 48 / 32 (scales cleanly to 512 / 128 / 32 / 16)">
+        <Block
+          title="04 · APP ICON · 180 / 96 / 48 / 32 (scales cleanly to 512 / 128 / 32 / 16)"
+          assets={[
+            { id: "asset-icon-180", name: "bomb-blast-arena-icon-180", label: "icon 180" },
+            { id: "asset-icon-96", name: "bomb-blast-arena-icon-96", label: "96" },
+            { id: "asset-icon-48", name: "bomb-blast-arena-icon-48", label: "48" },
+            { id: "asset-icon-32", name: "bomb-blast-arena-icon-32", label: "32" },
+            { id: "asset-capsule", name: "bomb-blast-arena-capsule-460x215", label: "capsule 460×215" },
+          ]}
+        >
           <div style={{ display: "flex", flexWrap: "wrap", gap: 22, alignItems: "flex-end" }}>
-            <BombIcon size={180} radius={38} offset={[24, 22]} scale={1.12} background={iconGround} />
-            <BombIcon size={96} radius={20} offset={[13, 12]} scale={0.6} background={iconGround} />
-            <BombIcon size={48} radius={10} offset={[6, 6]} scale={0.3} background={iconGround} />
-            <BombIcon size={32} radius={7} offset={[4, 4]} scale={0.2} background="#ff9a2b" />
+            <BombIcon id="asset-icon-180" size={180} radius={38} offset={[24, 22]} scale={1.12} background={iconGround} />
+            <BombIcon id="asset-icon-96" size={96} radius={20} offset={[13, 12]} scale={0.6} background={iconGround} />
+            <BombIcon id="asset-icon-48" size={48} radius={10} offset={[6, 6]} scale={0.3} background={iconGround} />
+            <BombIcon id="asset-icon-32" size={32} radius={7} offset={[4, 4]} scale={0.2} background="#ff9a2b" />
 
+            <FitWidth w={460} h={215}>
             <div
+              id="asset-capsule"
               style={{
                 width: 460,
                 height: 215,
@@ -690,6 +743,7 @@ export default function MarketingAssets() {
                 <Guy p={BLUE} scale={1.25} state="idle" facing="left" />
               </div>
             </div>
+            </FitWidth>
             <div style={caption}>icon drops the wordmark; store capsule keeps it · 460×215</div>
           </div>
         </Block>

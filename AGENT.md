@@ -142,8 +142,11 @@ The game engine is DOM-bound and uses `Math.random`/`setTimeout`, so it cannot
 run headless on the server or in lockstep. Instead:
 
 - **Relay server** (`server/ws-server.js`, CommonJS, `ws`): game-agnostic. Manages
-  rooms, 4-letter codes, up to 4 slots, and relays messages between host and
-  guests. Never inspects game payloads.
+  rooms, 4-letter codes, up to 4 player slots plus up to 8 spectators
+  (`NET_CONFIG.maxSpectators`), and relays messages between host and guests.
+  Spectators receive host broadcasts but cannot send to the host; they may
+  join locked rooms — the server pings the host (`spectatorJoined`) so it can
+  re-send the start payload. Never inspects game payloads.
 - **Host browser** runs the real engine unchanged and streams authoritative
   state. `src/game/net/host.ts` relays bomb blasts (`setOnBombExplode`) and
   broadcasts full state snapshots every `NET_CONFIG.snapshotIntervalMs` (50ms)
@@ -155,6 +158,9 @@ run headless on the server or in lockstep. Instead:
   host's `start` payload, creates local `Player` instances so `game.tsx`
   renders unchanged, and applies each snapshot (`applyCellSnapshots` +
   `syncTimedFlags`). Keyboard input is sent to the host as `InputPayload`.
+  **Spectators** use the same guest view in spectator mode (no input listener,
+  nothing sent to the host); they can also join mid-game via the
+  `spectatorJoined` → re-sent `start` flow.
 - **Engine input** is per-player (`inputByPlayer` map in `engine.ts`): the
   keyboard writes to the local player's entry; `setRemoteInput` applies guest
   input. `setRoster` declares which slots are local/remote/computer.
@@ -208,14 +214,19 @@ the `frame_id` query param Discord injects into the iframe URL
 
 | Module | Responsibility |
 | --- | --- |
-| `src/discord/client.ts` | Detection, SDK init, OAuth (`identify` + `rpc.activities.write`), ws proxy patching, invite `customId` parsing |
-| `src/discord/presence.ts` | `updatePresence(gameState, ctx)` — maps game state to `setActivity` payloads (party size, elapsed timer, winner) |
+| `src/discord/client.ts` | Detection, SDK init, OAuth (`identify` + `rpc.activities.write`), ws proxy patching, invite `customId` + `ACTIVITY_JOIN` room-code handling, Discord display name |
+| `src/discord/presence.ts` | `updatePresence(gameState, ctx)` — maps game state to `setActivity` payloads (party size, elapsed timer, winner, join secret while in a lobby) |
 | `src/app/api/token/route.ts` | OAuth code → access token exchange |
 
 Presence updates fire on `GameState` transitions in `page.tsx` (never
-per-frame — Discord rate-limits `SET_ACTIVITY`). Lobby invites use
-`commands.shareLink({ custom_id: "room:<CODE>" })`; recipients launch the
-Activity with that code and land in the lobby with it pre-filled.
+per-frame — Discord rate-limits `SET_ACTIVITY`). While in a room lobby the
+presence carries `instance: true` + `secrets.join: "room:<CODE>"`, which
+makes Discord render a **Join** button; joiners get the code via the
+`ACTIVITY_JOIN` dispatch. Lobby invites also use
+`commands.shareLink({ custom_id: "room:<CODE>" })`. Either way, recipients
+auto-join the room under their Discord display name (capped at 16 chars) —
+falling back to a pre-filled join box if auth yielded no name — and the
+relay rejects the join when the room is full or already started.
 
 ## Controls
 
