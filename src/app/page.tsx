@@ -52,6 +52,7 @@ import {
 } from "../game/net/guest";
 import {
   handleGuestPayload,
+  sendBackToLobby,
   sendGameOver,
   sendStart,
   startHosting,
@@ -62,6 +63,7 @@ import { Direction, GameMode, GameState } from "../types/game";
 import {
   GamePayload,
   RoomPlayer,
+  RoomRole,
   RoomSpectator,
   RosterEntry,
 } from "../types/multiplayer";
@@ -97,6 +99,9 @@ export default function Home() {
   const [isGuest, setIsGuest] = useState(false);
   // True when this client spectates: receives host state but sends no input.
   const [isSpectator, setIsSpectator] = useState(false);
+  // Guest-side: the host signalled it is back in the room lobby, so the
+  // end-screen "Return to Lobby" button can be enabled.
+  const [hostBackInLobby, setHostBackInLobby] = useState(false);
 
   // The host's roster, kept in a ref so the PLAYING effect and relay handler
   // can read it without re-subscribing.
@@ -127,24 +132,6 @@ export default function Home() {
     () => {}
   );
   const handleSpectatorJoinedRef = useRef<() => void>(() => {});
-  // Pending Discord auto-join — lets a "Room is full" / "Game already
-  // started" rejection fall back to spectating instead of dead-ending.
-  const pendingDiscordJoinRef = useRef<{ code: string; name: string } | null>(
-    null
-  );
-  const discordJoinErrorRef = useRef<(message: string) => void>(() => {});
-  discordJoinErrorRef.current = (message) => {
-    const pending = pendingDiscordJoinRef.current;
-    pendingDiscordJoinRef.current = null;
-    if (
-      !pending ||
-      (message !== "Room is full" && message !== "Game already started")
-    ) {
-      return;
-    }
-    roomClient.reset();
-    handleSpectateRoom(pending.code, pending.name);
-  };
 
   const handleRelay = (from: number, payload: GamePayload) => {
     if (isGuest) {
@@ -152,16 +139,19 @@ export default function Home() {
       if (payload.t === "start") {
         // The host re-broadcasts start when a spectator joins a locked room;
         // ignore the duplicate once this view is already in the match.
+        setHostBackInLobby(false);
         if (
           gameState !== GameState.PLAYING &&
           gameState !== GameState.PAUSED
         ) {
-          startGuestView(payload, isSpectator);
+          startGuestView(payload, roomClient.isSpectator());
           setGameState(GameState.PLAYING);
         }
       } else if (payload.t === "gameOver") {
         handleHostPayload(payload);
         setGameState(payload.state === "WIN" ? GameState.WIN : GameState.GAME_OVER);
+      } else if (payload.t === "backToLobby") {
+        setHostBackInLobby(true);
       } else {
         handleHostPayload(payload);
       }
@@ -189,7 +179,9 @@ export default function Home() {
   // =========================
   useEffect(() => {
     roomClient.setOnRoom((code, players, spectators) => {
-      pendingDiscordJoinRef.current = null;
+      // The room broadcast is how a join that auto-landed as spectator — or
+      // a mid-lobby role switch — reaches React state.
+      setIsSpectator(roomClient.isSpectator());
       // Mid-game guest disconnect (host only): eliminate the departed remote
       // player so they don't linger as a frozen character. rosterRef is only
       // populated on the host, so this block never runs on guests.
@@ -222,7 +214,6 @@ export default function Home() {
 
     roomClient.setOnError((message) => {
       setLobbyState((prev) => ({ ...prev, error: message, connecting: false }));
-      discordJoinErrorRef.current(message);
     });
 
     roomClient.setOnHostLeft(() => {
@@ -230,6 +221,7 @@ export default function Home() {
       stopGuestView();
       setIsGuest(false);
       setIsSpectator(false);
+      setHostBackInLobby(false);
       setGameState(GameState.START);
       setLobbyState((prev) => ({
         ...prev,
@@ -276,7 +268,6 @@ export default function Home() {
     const name = discordNameRef.current;
     if (name) {
       if (lobbyState.code) roomClient.reset(); // leave any current room
-      pendingDiscordJoinRef.current = { code, name };
       handleJoinRoom(code, name);
     } else {
       setInviteJoinCode(code);
@@ -520,30 +511,17 @@ export default function Home() {
     }
   };
 
-  const handleSpectateRoom = async (code: string, name: string) => {
-    setLobbyState((prev) => ({ ...prev, connecting: true, error: null, myName: name }));
-    setIsGuest(true);
-    setIsSpectator(true);
-    setGameMode("online");
-    try {
-      await roomClient.connect();
-      roomClient.spectateRoom(code, name);
-    } catch {
-      setLobbyState((prev) => ({
-        ...prev,
-        connecting: false,
-        error: relayConnectError,
-      }));
-      setIsGuest(false);
-      setIsSpectator(false);
-      setGameMode("solo");
-    }
+  // Switch between player and spectator mid-lobby. The server confirms with
+  // a joined/spectating message + room broadcast, which updates isSpectator.
+  const handleSwitchRole = (role: RoomRole) => {
+    roomClient.setRole(role);
   };
 
   const handleLeaveRoom = () => {
     roomClient.leaveRoom();
     setIsGuest(false);
     setIsSpectator(false);
+    setHostBackInLobby(false);
     setLobbyState({
       code: null,
       players: [],
@@ -560,6 +538,7 @@ export default function Home() {
     stopGuestView();
     setIsGuest(false);
     setIsSpectator(false);
+    setHostBackInLobby(false);
     setGameState(GameState.START);
     setLobbyState({
       code: null,
@@ -659,6 +638,7 @@ export default function Home() {
       stopHosting();
       setIsGuest(false);
       setIsSpectator(false);
+      setHostBackInLobby(false);
     }
     // Clear the room from lobby state too — otherwise the stale code/players
     // would leak a phantom party into the next game's rich presence.
@@ -680,21 +660,30 @@ export default function Home() {
     if (gameMode === "online" && isGuest) return; // guests can't restart
 
     if (gameMode === "online" && !isGuest) {
-      // Host restarts with the same roster.
-      resetGrid();
-      tracker.reset();
-      tracker.startGame();
-      setRoster(rosterRef.current);
-      sendStart(rosterRef.current);
+      // Host returns to the room lobby instead of restarting straight away:
+      // guests follow via the backToLobby payload, the room is unlocked so
+      // players can join/leave again, and a fresh roster is built on start.
+      sendBackToLobby();
+      roomClient.unlockRoom();
+      rosterRef.current = [];
       setWinner(undefined);
       setTimeElapsedMs(0);
-      setGameState(GameState.PLAYING);
+      setGameState(GameState.LOBBY);
       return;
     }
 
     // Solo/local: restart straight away with the same map selection — a
     // "random" pick re-rolls on this reset.
     startLocalGame(gameMode);
+  };
+
+  // Guest/spectator: leave the end screen for the room lobby. Only offered
+  // once the host has signalled it is back in the lobby itself.
+  const handleReturnToLobby = () => {
+    stopGuestView();
+    setWinner(undefined);
+    setTimeElapsedMs(0);
+    setGameState(GameState.LOBBY);
   };
 
   // =========================
@@ -744,6 +733,9 @@ export default function Home() {
 
   // Whether to show the "Play Again" button (host or solo/local only).
   const canPlayAgain = !(gameMode === "online" && isGuest);
+  // Online guests/spectators get a "Return to Lobby" button instead, enabled
+  // once the host has signalled it is back in the lobby.
+  const canReturnToLobby = gameMode === "online" && isGuest;
 
   // =========================
   // Touch controls
@@ -828,7 +820,7 @@ export default function Home() {
             initialJoinCode={inviteJoinCode}
             onCreate={handleCreateRoom}
             onJoin={handleJoinRoom}
-            onSpectate={handleSpectateRoom}
+            onSwitchRole={handleSwitchRole}
             onLeave={handleLeaveRoom}
             onStart={handleStartOnlineGame}
             onBack={handleLobbyBack}
@@ -856,6 +848,8 @@ export default function Home() {
             gameStats={getEndGameStats()}
             onReturnToMenu={handleGameRestart}
             onPlayAgain={canPlayAgain ? handlePlayAgain : undefined}
+            onReturnToLobby={canReturnToLobby ? handleReturnToLobby : undefined}
+            returnToLobbyEnabled={hostBackInLobby}
           />
         )}
       </div>

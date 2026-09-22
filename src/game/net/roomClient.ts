@@ -3,6 +3,7 @@ import {
   ClientToServerMessage,
   GamePayload,
   RoomPlayer,
+  RoomRole,
   RoomSpectator,
   ServerToClientMessage,
 } from "../../types/multiplayer";
@@ -12,7 +13,7 @@ import { DISCORD_CONFIG, getServerUrl } from "../core/config";
 // Room client (singleton)
 // =========================
 // Thin wrapper around a WebSocket connection to the relay server. Handles
-// the connection-management protocol (create/join/spectate/leave/lock/relay)
+// the connection-management protocol (create/join/setRole/leave/lock/relay)
 // and exposes event setters the UI and host/guest layers subscribe to.
 
 /**
@@ -193,15 +194,22 @@ class RoomClient {
     this.send({ t: "create", name });
   }
 
+  /**
+   * Join a room. When no player slot is free (room full or game already
+   * started) the server lands the join as a spectator instead of failing.
+   */
   public joinRoom(code: string, name: string) {
     this.name = name;
     this.send({ t: "join", code, name });
   }
 
-  /** Join a room as a spectator: receives host broadcasts, sends nothing. */
-  public spectateRoom(code: string, name: string) {
-    this.name = name;
-    this.send({ t: "spectate", code, name });
+  /**
+   * Switch between player and spectator while in a room lobby. The server
+   * confirms with a `joined`/`spectating` message followed by a room
+   * broadcast, so no local state changes here.
+   */
+  public setRole(role: RoomRole) {
+    this.send({ t: "setRole", role });
   }
 
   public leaveRoom() {
@@ -211,6 +219,11 @@ class RoomClient {
 
   public lockRoom() {
     this.send({ t: "lock" });
+  }
+
+  /** Unlock the room so new players can join (host only, between matches). */
+  public unlockRoom() {
+    this.send({ t: "unlock" });
   }
 
   /** Send a game payload to the host (guest -> host). */

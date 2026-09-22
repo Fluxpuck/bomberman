@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { NET_CONFIG } from "../../game/core/config";
-import { RoomPlayer, RoomSpectator } from "../../types/multiplayer";
+import { RoomPlayer, RoomRole, RoomSpectator } from "../../types/multiplayer";
 import {
   Button,
   Checkbox,
@@ -23,14 +23,15 @@ interface LobbyScreenProps {
   players: RoomPlayer[];
   spectators: RoomSpectator[];
   isHost: boolean;
-  /** True when this client joined as a spectator (watch-only). */
+  /** True when this client is a spectator in the room (watch-only). */
   isSpectator: boolean;
   myName: string;
   error: string | null;
   connecting: boolean;
   onCreate: (name: string) => void;
   onJoin: (code: string, name: string) => void;
-  onSpectate: (code: string, name: string) => void;
+  /** Switch between player and spectator while in the room lobby. */
+  onSwitchRole: (role: RoomRole) => void;
   onLeave: () => void;
   onStart: (fillBots: boolean) => void;
   onBack: () => void;
@@ -51,7 +52,7 @@ export function LobbyScreen({
   connecting,
   onCreate,
   onJoin,
-  onSpectate,
+  onSwitchRole,
   onLeave,
   onStart,
   onBack,
@@ -157,19 +158,14 @@ export function LobbyScreen({
                 aria-label="Room code"
                 className="flex-1 min-w-0 w-auto! text-center text-xl! uppercase tracking-[0.3em] font-bold"
               />
+              {/* A full or already-started room lands the join as a
+                  spectator instead of failing — no separate Watch needed. */}
               <Button
                 variant="green"
                 disabled={!name.trim() || joinCode.length !== 4 || connecting}
                 onClick={() => onJoin(joinCode, name.trim())}
               >
                 Join
-              </Button>
-              <Button
-                variant="blue"
-                disabled={!name.trim() || joinCode.length !== 4 || connecting}
-                onClick={() => onSpectate(joinCode, name.trim())}
-              >
-                Watch
               </Button>
             </div>
           </div>
@@ -274,6 +270,28 @@ export function LobbyScreen({
                     ? "Spectating — waiting for host to start…"
                     : "Waiting for host to start…"}
                 </p>
+                {/* Non-host members can switch roles in the lobby. The host
+                    can't spectate — they run the authoritative game. */}
+                {isSpectator ? (
+                  <Button
+                    block
+                    variant="green"
+                    size="sm"
+                    disabled={players.length >= 4}
+                    onClick={() => onSwitchRole("player")}
+                  >
+                    {players.length >= 4 ? "Player slots full" : "Join as player"}
+                  </Button>
+                ) : (
+                  <Button
+                    block
+                    variant="blue"
+                    size="sm"
+                    onClick={() => onSwitchRole("spectator")}
+                  >
+                    Watch instead
+                  </Button>
+                )}
                 <Button block variant="red" size="sm" onClick={onLeave}>
                   Leave Room
                 </Button>

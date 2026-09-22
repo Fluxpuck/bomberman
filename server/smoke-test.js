@@ -1,7 +1,7 @@
 // Smoke test for the relay server. Uses Node's built-in WebSocket (Node 22+).
 // Run after starting the server: node server/ws-server.js
 
-const WS_URL = "ws://localhost:3001";
+const WS_URL = process.env.WS_URL || "ws://localhost:3001";
 
 /** Wrap a WebSocket with a message queue so no messages are lost. */
 function queued(ws) {
@@ -119,44 +119,132 @@ async function run() {
   }
   assert(spectatorRelayDropped, "spectator input relay is dropped");
 
-  // --- Lock room: new player joins rejected ---
+  // --- Role switch: player -> spectator frees the slot ---
+  send(guest, { t: "setRole", role: "spectator" });
+  const guestSpectating = await guestQ.recv();
+  assert(guestSpectating.t === "spectating", "player switching to spectator receives 'spectating'");
+  const guestRoomSwitch = await guestQ.recv();
+  const hostRoomSwitch = await hostQ.recv();
+  await specQ.recv(); // spectator's room broadcast
+  assert(
+    guestRoomSwitch.t === "room" &&
+      guestRoomSwitch.players.length === 1 &&
+      guestRoomSwitch.spectators.length === 2,
+    "player->spectator frees the slot"
+  );
+
+  // --- Role switch: spectator -> player takes the smallest free slot ---
+  send(spectator, { t: "setRole", role: "player" });
+  const specJoined = await specQ.recv();
+  assert(specJoined.t === "joined" && specJoined.slot === 1, "spectator switching to player gets freed slot 1");
+  await specQ.recv(); // spectator's room broadcast
+  await guestQ.recv(); // guest's room broadcast
+  const hostRoomSwitch2 = await hostQ.recv();
+  assert(
+    hostRoomSwitch2.t === "room" &&
+      hostRoomSwitch2.players.length === 2 &&
+      hostRoomSwitch2.spectators.length === 1,
+    "spectator->player takes a slot"
+  );
+
+  // --- The host can't spectate (no host migration): ignored silently ---
+  send(host, { t: "setRole", role: "spectator" });
+  let hostSwitchIgnored = false;
+  try {
+    await hostQ.recv(300);
+  } catch {
+    hostSwitchIgnored = true;
+  }
+  assert(hostSwitchIgnored, "host role switch is ignored");
+
+  // --- Lock room: a join lands as spectator instead of failing ---
   send(host, { t: "lock" });
   await new Promise((r) => setTimeout(r, 100));
-  const lateJoiner = new WebSocket(WS_URL);
-  await new Promise((r) => (lateJoiner.onopen = r));
-  const lateQ = queued(lateJoiner);
-  send(lateJoiner, { t: "join", code, name: "Carol" });
-  const lateJoinResp = await lateQ.recv();
-  assert(lateJoinResp.t === "error" && lateJoinResp.message.includes("started"), "locked room rejects new joins");
-  lateJoiner.close();
-
-  // --- Spectators can still join a locked room; host is pinged to re-send start ---
-  const lateSpec = new WebSocket(WS_URL);
-  await new Promise((r) => (lateSpec.onopen = r));
-  const lateSpecQ = queued(lateSpec);
-  send(lateSpec, { t: "spectate", code, name: "Frank" });
-  const lateSpectating = await lateSpecQ.recv();
-  assert(lateSpectating.t === "spectating", "locked room still accepts spectators");
-  await lateSpecQ.recv(); // lateSpec's room broadcast
+  const carol = new WebSocket(WS_URL);
+  await new Promise((r) => (carol.onopen = r));
+  const carolQ = queued(carol);
+  send(carol, { t: "join", code, name: "Carol" });
+  const carolResp = await carolQ.recv();
+  assert(carolResp.t === "spectating", "locked room lands new joins as spectators");
+  await carolQ.recv(); // Carol's room broadcast
   await guestQ.recv(); // guest's room broadcast
-  await specQ.recv(); // first spectator's room broadcast
-  const hostRoom4 = await hostQ.recv();
-  assert(hostRoom4.t === "room" && hostRoom4.spectators.length === 2, "host sees 2 spectators");
+  await specQ.recv(); // spectator's room broadcast
+  const hostRoomLocked = await hostQ.recv();
+  assert(hostRoomLocked.t === "room" && hostRoomLocked.spectators.length === 2, "host sees locked join as spectator");
   const hostSpecPing = await hostQ.recv();
-  assert(hostSpecPing.t === "spectatorJoined", "host gets spectatorJoined for late spectator");
+  assert(hostSpecPing.t === "spectatorJoined", "host gets spectatorJoined for locked join");
+
+  // --- Role switches are rejected once the room is locked ---
+  send(guest, { t: "setRole", role: "player" });
+  const lockedRoleResp = await guestQ.recv();
+  assert(lockedRoleResp.t === "error" && lockedRoleResp.message.includes("started"), "role switch rejected once locked");
+
+  // --- Unlock room: new joins accepted again (host back in lobby) ---
+  send(host, { t: "unlock" });
+  await new Promise((r) => setTimeout(r, 100));
+  const dave = new WebSocket(WS_URL);
+  await new Promise((r) => (dave.onopen = r));
+  const daveQ = queued(dave);
+  send(dave, { t: "join", code, name: "Dave" });
+  const daveResp = await daveQ.recv();
+  assert(daveResp.t === "joined" && daveResp.slot === 2, "unlocked room accepts joins again");
+  // Drain the join's room broadcast on every member queue.
+  await daveQ.recv();
+  await hostQ.recv();
+  await guestQ.recv();
+  await specQ.recv();
+  await carolQ.recv();
+
+  // --- Fill the last player slot, then a join lands as spectator ---
+  const frank = new WebSocket(WS_URL);
+  await new Promise((r) => (frank.onopen = r));
+  const frankQ = queued(frank);
+  send(frank, { t: "join", code, name: "Frank" });
+  const frankResp = await frankQ.recv();
+  assert(frankResp.t === "joined" && frankResp.slot === 3, "fourth player joins with slot 3");
+  await frankQ.recv();
+  await hostQ.recv();
+  await guestQ.recv();
+  await specQ.recv();
+  await carolQ.recv();
+  await daveQ.recv();
+
+  const gina = new WebSocket(WS_URL);
+  await new Promise((r) => (gina.onopen = r));
+  const ginaQ = queued(gina);
+  send(gina, { t: "join", code, name: "Gina" });
+  const ginaResp = await ginaQ.recv();
+  assert(ginaResp.t === "spectating", "join on a full room lands as spectator");
+  const ginaRoom = await ginaQ.recv();
+  assert(ginaRoom.t === "room" && ginaRoom.players.length === 4 && ginaRoom.spectators.length === 3, "full-room join sees the spectator list");
+  await hostQ.recv();
+  await guestQ.recv();
+  await specQ.recv();
+  await carolQ.recv();
+  await daveQ.recv();
+  await frankQ.recv();
 
   // --- Host leaves: guests and spectators get hostLeft ---
   host.close();
   const guestHostLeft = await guestQ.recv();
-  assert(guestHostLeft.t === "hostLeft", "guest receives hostLeft when host disconnects");
+  assert(guestHostLeft.t === "hostLeft", "spectator (ex-player) receives hostLeft when host disconnects");
   const specHostLeft = await specQ.recv();
-  assert(specHostLeft.t === "hostLeft", "spectator receives hostLeft when host disconnects");
-  const lateSpecHostLeft = await lateSpecQ.recv();
-  assert(lateSpecHostLeft.t === "hostLeft", "late spectator receives hostLeft when host disconnects");
+  assert(specHostLeft.t === "hostLeft", "player (ex-spectator) receives hostLeft when host disconnects");
+  const carolHostLeft = await carolQ.recv();
+  assert(carolHostLeft.t === "hostLeft", "locked join (spectator) receives hostLeft when host disconnects");
+  const daveHostLeft = await daveQ.recv();
+  assert(daveHostLeft.t === "hostLeft", "rejoined player receives hostLeft when host disconnects");
+  const frankHostLeft = await frankQ.recv();
+  assert(frankHostLeft.t === "hostLeft", "fourth player receives hostLeft when host disconnects");
+  const ginaHostLeft = await ginaQ.recv();
+  assert(ginaHostLeft.t === "hostLeft", "full-room join (spectator) receives hostLeft when host disconnects");
 
   guest.close();
   spectator.close();
-  lateSpec.close();
+  carol.close();
+  dave.close();
+  frank.close();
+  gina.close();
 
   // Let in-flight socket closes settle before exiting — exiting mid-close
   // trips a libuv assertion on Windows.

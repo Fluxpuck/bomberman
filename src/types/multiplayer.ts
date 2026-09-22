@@ -3,7 +3,8 @@
 // =========================
 // Shared between the browser client (roomClient/host/guest) and the relay
 // server. The server only uses the connection-management messages
-// (create/join/leave/lock/relay); the game payload types are used by clients.
+// (create/join/spectate/setRole/leave/lock/relay); the game payload types are
+// used by clients.
 
 import { TileKind } from "../game/assets/blocks";
 import { PowerupType } from "../game/assets/powerups";
@@ -26,6 +27,9 @@ export interface RoomSpectator {
   name: string;
 }
 
+/** The role a room member holds: a player takes a slot, a spectator watches. */
+export type RoomRole = "player" | "spectator";
+
 /** How a slot in the local roster is controlled. */
 export type ControlKind = "local" | "remote" | "computer";
 
@@ -45,8 +49,10 @@ export type ClientToServerMessage =
   | { t: "create"; name: string }
   | { t: "join"; code: string; name: string }
   | { t: "spectate"; code: string; name: string }
+  | { t: "setRole"; role: RoomRole }
   | { t: "leave" }
   | { t: "lock" }
+  | { t: "unlock" }
   | { t: "relay"; to: "host" | "guests"; payload: GamePayload };
 
 export type ServerToClientMessage =
@@ -147,11 +153,20 @@ export interface GameOverPayload {
   gameStats: import("../game/hooks/tracker").GameStats;
 }
 
+/**
+ * Sent by the host when it returns to the room lobby after a match, so
+ * guests can enable their own "Return to Lobby" button.
+ */
+export interface BackToLobbyPayload {
+  t: "backToLobby";
+}
+
 export type GamePayload =
   | InputPayload
   | SnapshotPayload
   | StartPayload
   | BlastPayload
   | GameOverPayload
+  | BackToLobbyPayload
   | LatencyPingPayload
   | LatencyPongPayload;

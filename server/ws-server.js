@@ -4,7 +4,10 @@
 // Game-agnostic WebSocket relay. Knows only about rooms, 4-letter codes,
 // up to 4 player slots + 8 spectators per room, and forwarding messages
 // between host and guests. Spectators receive host broadcasts but cannot
-// send to the host. The actual game protocol (start/snapshot/blast/input)
+// send to the host. A `join` that finds no free player slot (room full or
+// game already locked) lands as a spectator instead of failing, and lobby
+// members can switch roles with `setRole` — except the host, who runs the
+// authoritative game. The actual game protocol (start/snapshot/blast/input)
 // lives entirely in the browser clients; this server never inspects game
 // payloads.
 //
@@ -77,6 +80,30 @@ function findRoomByCode(code) {
   return roomsByCode.get((code || "").toUpperCase());
 }
 
+/**
+ * Add a socket to a room as a spectator: receive-only, no slot. Used by the
+ * `spectate` message and by `join` when no player slot is available (room
+ * full or game already started). When joining a locked room the host is
+ * pinged so it re-sends the start payload and this spectator can build the
+ * grid mid-game.
+ */
+function addSpectator(room, ws, name) {
+  if (room.spectators.length >= MAX_SPECTATORS_PER_ROOM) {
+    send(ws, { t: "error", message: "Spectator limit reached" });
+    ws.close();
+    return;
+  }
+  const spectator = { name: name || "Spectator", ws };
+  room.spectators.push(spectator);
+  sessions.set(ws, { room, player: spectator, isSpectator: true });
+  send(ws, { t: "spectating", code: room.code });
+  broadcastRoom(room);
+  if (room.locked) {
+    const host = room.players.find((p) => p.isHost);
+    if (host) send(host.ws, { t: "spectatorJoined" });
+  }
+}
+
 function leaveRoom(session) {
   if (!session) return;
   const { room, player, isSpectator } = session;
@@ -129,6 +156,55 @@ function handleMessage(session, data) {
     case "lock": {
       if (session.isSpectator || !player.isHost) return;
       room.locked = true;
+      break;
+    }
+    case "setRole": {
+      // Role changes are a lobby concept: once the room is locked the roster
+      // is fixed and a player slot can't be claimed or freed mid-match.
+      if (room.locked) {
+        send(player.ws, { t: "error", message: "Game already started" });
+        break;
+      }
+      if (msg.role === "spectator" && !session.isSpectator) {
+        // The host runs the authoritative engine and there's no host
+        // migration, so the host can't become a spectator.
+        if (player.isHost) break;
+        if (room.spectators.length >= MAX_SPECTATORS_PER_ROOM) {
+          send(player.ws, { t: "error", message: "Spectator limit reached" });
+          break;
+        }
+        room.players = room.players.filter((p) => p !== player);
+        const spectator = { name: player.name, ws: player.ws };
+        room.spectators.push(spectator);
+        session.player = spectator;
+        session.isSpectator = true;
+        send(spectator.ws, { t: "spectating", code: room.code });
+        broadcastRoom(room);
+      } else if (msg.role === "player" && session.isSpectator) {
+        if (room.players.length >= MAX_PLAYERS_PER_ROOM) {
+          send(player.ws, { t: "error", message: "Room is full" });
+          break;
+        }
+        // Assign the smallest free slot, same as a fresh join.
+        const usedSlots = new Set(room.players.map((p) => p.slot));
+        let slot = 0;
+        while (usedSlots.has(slot)) slot++;
+        const newPlayer = { slot, name: player.name, ws: player.ws, isHost: false };
+        room.spectators = room.spectators.filter((s) => s !== player);
+        room.players.push(newPlayer);
+        session.player = newPlayer;
+        session.isSpectator = false;
+        send(newPlayer.ws, { t: "joined", code: room.code, slot });
+        broadcastRoom(room);
+      }
+      break;
+    }
+    case "unlock": {
+      // Host returned to the lobby after a match: open the room back up so
+      // new players can join (and departed players can rejoin) before the
+      // next game.
+      if (session.isSpectator || !player.isHost) return;
+      room.locked = false;
       break;
     }
     case "relay": {
@@ -194,14 +270,10 @@ wss.on("connection", (ws) => {
           ws.close();
           return;
         }
-        if (room.locked) {
-          send(ws, { t: "error", message: "Game already started" });
-          ws.close();
-          return;
-        }
-        if (room.players.length >= MAX_PLAYERS_PER_ROOM) {
-          send(ws, { t: "error", message: "Room is full" });
-          ws.close();
+        // No slot for a new player — the room is full or the game already
+        // started — so the join lands as a spectator instead of failing.
+        if (room.locked || room.players.length >= MAX_PLAYERS_PER_ROOM) {
+          addSpectator(room, ws, msg.name);
           return;
         }
         // Assign the smallest free slot. Using players.length would collide
@@ -221,23 +293,7 @@ wss.on("connection", (ws) => {
           ws.close();
           return;
         }
-        if (room.spectators.length >= MAX_SPECTATORS_PER_ROOM) {
-          send(ws, { t: "error", message: "Spectator limit reached" });
-          ws.close();
-          return;
-        }
-        const spectator = { name: msg.name || "Spectator", ws };
-        room.spectators.push(spectator);
-        sessions.set(ws, { room, player: spectator, isSpectator: true });
-        send(ws, { t: "spectating", code: room.code });
-        broadcastRoom(room);
-        // Joining a locked room means the game is already running: ping the
-        // host so it re-sends the start payload and this spectator can build
-        // the grid.
-        if (room.locked) {
-          const host = room.players.find((p) => p.isHost);
-          if (host) send(host.ws, { t: "spectatorJoined" });
-        }
+        addSpectator(room, ws, msg.name);
       } else {
         send(ws, { t: "error", message: "Expected create, join or spectate first" });
         ws.close();

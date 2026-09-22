@@ -167,6 +167,14 @@ export function sendGameOver(state: GameState, winnerId?: string) {
 }
 
 /**
+ * Tell guests the host has returned to the room lobby after a match, so
+ * their end-screen "Return to Lobby" button becomes active.
+ */
+export function sendBackToLobby() {
+  roomClient.sendToGuests({ t: "backToLobby" });
+}
+
+/**
  * Handle a relayed payload arriving from a guest. Only `input` messages are
  * expected from guests; they are routed to the engine via setRemoteInput.
  */

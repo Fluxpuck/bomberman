@@ -146,7 +146,10 @@ run headless on the server or in lockstep. Instead:
   (`NET_CONFIG.maxSpectators`), and relays messages between host and guests.
   Spectators receive host broadcasts but cannot send to the host; they may
   join locked rooms — the server pings the host (`spectatorJoined`) so it can
-  re-send the start payload. Never inspects game payloads.
+  re-send the start payload. A `join` that finds no free player slot (room
+  full or already locked) lands as a spectator instead of failing, and lobby
+  members switch roles with `setRole` — the host can't spectate (no host
+  migration). Never inspects game payloads.
 - **Host browser** runs the real engine unchanged and streams authoritative
   state. `src/game/net/host.ts` relays bomb blasts (`setOnBombExplode`) and
   broadcasts full state snapshots every `NET_CONFIG.snapshotIntervalMs` (50ms)
@@ -165,8 +168,11 @@ run headless on the server or in lockstep. Instead:
   keyboard writes to the local player's entry; `setRemoteInput` applies guest
   input. `setRoster` declares which slots are local/remote/computer.
 - Pause is disabled in online games (`pauseGame` no-ops when `hasRemotePlayers`).
-- Late joins are blocked once the host calls `lockRoom`. Host disconnect closes
-  the room and guests get `hostLeft`.
+- Once the host calls `lockRoom`, joins land as spectators and `setRole` is
+  rejected. Host disconnect closes the room and guests get `hostLeft`.
+- After a match, "Play Again" returns the host to the room lobby: it broadcasts
+  `backToLobby` (which enables the guests' end-screen "Return to Lobby" button)
+  and sends `unlock` so the room accepts joins again until the next `lock`.
 
 ### Key modules
 
@@ -177,13 +183,13 @@ run headless on the server or in lockstep. Instead:
 | `src/game/net/roomClient.ts` | Singleton WebSocket client wrapper + event setters |
 | `src/game/net/host.ts` | Host: snapshot broadcast, blast relay, guest input routing |
 | `src/game/net/guest.ts` | Guest: grid rebuild, snapshot apply, keyboard→host, sounds |
-| `src/components/screens/lobbyScreen.tsx` | Create/join room UI, roster, host start controls |
+| `src/components/screens/lobbyScreen.tsx` | Create/join room UI, roster, player/spectator role switching, host start controls |
 
 ### Smoke test
 
 `node server/smoke-test.js` (after starting the relay) verifies the room/relay
-protocol: create, join, bidirectional relay, lock rejects late joins, hostLeft
-on host disconnect.
+protocol: create, join, bidirectional relay, role switching, joins landing as
+spectators on full/locked rooms, hostLeft on host disconnect.
 
 ## Discord Activity (rich presence)
 
