@@ -8,6 +8,10 @@ services:
         # For a Cloudflare Tunnel deployment set this to the public relay
         # URL, e.g. wss://ws.bomb-blast-arena.example.com
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3001}
+        NEXT_PUBLIC_DISCORD_CLIENT_ID: ${NEXT_PUBLIC_DISCORD_CLIENT_ID:-}
+    environment:
+      # Server-side OAuth secret for /api/token (Discord Activity auth).
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
     restart: unless-stopped
     ports:
       - "3000:3000"

@@ -21,6 +21,8 @@ FROM base AS builder
 #   docker build --build-arg NEXT_PUBLIC_WS_URL=wss://your-host:3001 .
 ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_DISCORD_CLIENT_ID
+ENV NEXT_PUBLIC_DISCORD_CLIENT_ID=$NEXT_PUBLIC_DISCORD_CLIENT_ID
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN yarn build

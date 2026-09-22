@@ -1,10 +1,24 @@
 import type { Metadata } from "next";
-import { Bungee, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+// Vendored woff2 files (Google Fonts, latin subset) — next/font/google fetches
+// fonts at build time, which fails in the Docker build's restricted network.
+import localFont from "next/font/local";
 import "./globals.css";
 
-const bungee = Bungee({ weight: "400", subsets: ["latin"], variable: "--font-bungee" });
-const spaceGrotesk = Space_Grotesk({ weight: ["500", "700"], subsets: ["latin"], variable: "--font-space" });
-const jetbrainsMono = JetBrains_Mono({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-mono" });
+const bungee = localFont({
+  src: "./fonts/bungee.woff2",
+  weight: "400",
+  variable: "--font-bungee",
+});
+const spaceGrotesk = localFont({
+  src: "./fonts/space-grotesk.woff2",
+  weight: "300 700",
+  variable: "--font-space",
+});
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono.woff2",
+  weight: "100 800",
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   title: "Bomb Blast Arena",
