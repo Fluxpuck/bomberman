@@ -286,9 +286,11 @@ export function applyBlast(payload: BlastPayload) {
 
   playSound("soundFX", "explosion", 0.5);
 
+  // Scale to this client's live cell size, not the host's — the host's grid
+  // may render at a different size (small window, portrait layout).
   const blast = createBlastVisual(
     payload.reach as BlastReach,
-    payload.cellSizePx
+    centerCell.offsetWidth || GRID_PATTERN.cellSize
   );
   Object.assign(blast.style, {
     position: "absolute",

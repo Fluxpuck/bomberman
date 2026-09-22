@@ -10,7 +10,7 @@ import {
 } from "../../types/multiplayer";
 import { NET_CONFIG } from "../core/config";
 import { setOnBombExplode, setRemoteInput } from "../engine";
-import { getCellSnapshots, getLayoutCellTypes, grid } from "../grid";
+import { getCellSnapshots, getLayoutCellTypes } from "../grid";
 import { tracker } from "../hooks/tracker";
 import { characterManager } from "../player";
 import { roomClient } from "./roomClient";
@@ -103,14 +103,10 @@ export function startHosting(roster: RosterEntry[]) {
   blastRelayActive = true;
   setOnBombExplode((cells, _playerId) => {
     if (!blastRelayActive) return;
-    const cellSizePx =
-      (grid.querySelector("div") as HTMLElement | null)?.offsetWidth ||
-      NET_CONFIG.snapshotIntervalMs; // fallback unused, just avoid 0
     const blast: BlastPayload = {
       t: "blast",
       cells: cells.map((c) => ({ row: c.row, col: c.col })),
       reach: computeReachFromCells(cells),
-      cellSizePx,
     };
     roomClient.sendToGuests(blast);
   });

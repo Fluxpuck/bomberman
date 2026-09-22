@@ -1,8 +1,11 @@
-import type {
-  ButtonHTMLAttributes,
-  CSSProperties,
-  InputHTMLAttributes,
-  ReactNode,
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type InputHTMLAttributes,
+  type ReactNode,
 } from "react";
 
 /**
@@ -85,11 +88,46 @@ export function ErrorText({ className, children }: { className?: string; childre
 export const PANEL_GLASS =
   "bg-[rgba(10,17,32,.78)] backdrop-blur-[6px] border-2 border-ui-line shadow-[0_8px_22px_rgba(0,0,0,.4),inset_0_1px_0_rgba(255,255,255,.06)]";
 
-/** Full-screen scrim hosting a centered panel; scrolls on very small screens. */
+// Menu panels shrink to fit small viewports (Discord Activity tiles, narrow
+// windows) down to this factor — below it the screen scrolls instead.
+const MIN_PANEL_SCALE = 0.6;
+// Matches the p-4 scrim padding; excluded from the space the panel may fill.
+const SCREEN_PADDING = 16;
+
+/** Full-screen scrim hosting a centered panel; scales the panel down to fit
+ *  small viewports and scrolls below the minimum scale. */
 export function Screen({ children }: { children: ReactNode }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const update = () => {
+      const el = contentRef.current;
+      if (!el) return;
+      const fitW = (window.innerWidth - SCREEN_PADDING * 2) / el.offsetWidth;
+      const fitH = (window.innerHeight - SCREEN_PADDING * 2) / el.offsetHeight;
+      setScale(Math.min(1, Math.max(MIN_PANEL_SCALE, Math.min(fitW, fitH))));
+    };
+    update();
+    window.addEventListener("resize", update);
+    // The panel can grow after mount (lobby roster, error text) — re-fit.
+    const observer = new ResizeObserver(update);
+    if (contentRef.current) observer.observe(contentRef.current);
+    return () => {
+      window.removeEventListener("resize", update);
+      observer.disconnect();
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto backdrop-blur-[3px] bg-[radial-gradient(70%_55%_at_50%_30%,rgba(11,21,38,.55)_0%,rgba(7,13,24,.9)_100%)]">
-      {children}
+      <div
+        ref={contentRef}
+        className="m-auto"
+        style={{ transform: `scale(${scale})` }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

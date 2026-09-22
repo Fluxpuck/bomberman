@@ -137,7 +137,6 @@ export interface BlastPayload {
   t: "blast";
   cells: { row: number; col: number }[];
   reach: { up: number; down: number; left: number; right: number };
-  cellSizePx: number;
 }
 
 /** Sent by the host when the game ends so guests can show the end screen. */

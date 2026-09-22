@@ -1,4 +1,10 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { GameMode } from "../../types/game";
 import { Bomb, Bomber, Tile, type TileKind } from "../sprites";
 import { Button, type ButtonVariant } from "../ui";
@@ -34,6 +40,12 @@ const TILE_PATTERN: TileKind[] = [
 ];
 const TILE_ROWS = 3;
 
+// Once the layout unit's per-element floors are reached, the whole title +
+// menu column shrinks to fit short viewports — down to this factor, below
+// which it clips instead of becoming unreadable.
+const MIN_MENU_SCALE = 0.5;
+const MENU_BOTTOM_MARGIN = 12;
+
 /**
  * Layout unit: 1 = the 1920x1080 design artboard. Bound by height, and by
  * width against the title lockup (~1300 design px wide) so it never overflows.
@@ -56,6 +68,31 @@ function Abs({ style, children }: { style: CSSProperties; children: ReactNode })
 
 export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
   const u = useUnit();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuScale, setMenuScale] = useState(1);
+
+  // Fit the measured menu column inside the viewport below its top offset.
+  // offsetTop/offsetHeight are layout values, so the transform itself never
+  // feeds back into the measurement.
+  useEffect(() => {
+    const update = () => {
+      const el = menuRef.current;
+      if (!el) return;
+      const fit =
+        (window.innerHeight - el.offsetTop - MENU_BOTTOM_MARGIN) /
+        el.offsetHeight;
+      setMenuScale(Math.min(1, Math.max(MIN_MENU_SCALE, fit)));
+    };
+    update();
+    window.addEventListener("resize", update);
+    // Late-loading fonts change the column height without a resize.
+    const observer = new ResizeObserver(update);
+    if (menuRef.current) observer.observe(menuRef.current);
+    return () => {
+      window.removeEventListener("resize", update);
+      observer.disconnect();
+    };
+  }, [u]);
 
   // Measure before painting so the layout doesn't jump from a default size.
   if (u === null) return <div className="fixed inset-0 z-50" />;
@@ -126,8 +163,14 @@ export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
 
       {/* Title + menu */}
       <div
+        ref={menuRef}
         className="absolute inset-x-0 flex flex-col items-center"
-        style={{ top: 60 * u, gap: Math.max(10, 26 * u) }}
+        style={{
+          top: 60 * u,
+          gap: Math.max(10, 26 * u),
+          transform: `scale(${menuScale})`,
+          transformOrigin: "50% 0",
+        }}
       >
         <h1
           className="text-center whitespace-nowrap"
