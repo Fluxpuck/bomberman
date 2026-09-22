@@ -1,10 +1,5 @@
-import { useState } from "react";
-import {
-  getDiscordSdk,
-  initDiscordClient,
-  isDiscordActivity,
-} from "../../discord/client";
-import { DISCORD_CONFIG, NET_CONFIG } from "../../game/core/config";
+import { useRef, useState } from "react";
+import { NET_CONFIG } from "../../game/core/config";
 import { RoomPlayer, RoomSpectator } from "../../types/multiplayer";
 import {
   Button,
@@ -65,7 +60,8 @@ export function LobbyScreen({
   const [joinCode, setJoinCode] = useState(initialJoinCode);
   const [fillBots, setFillBots] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const codeRef = useRef<HTMLSpanElement>(null);
 
   const inRoom = roomCode !== null;
   // Spectators count as participants so a host can start a match for an
@@ -73,37 +69,42 @@ export function LobbyScreen({
   const participantCount = players.length + spectators.length;
   const canStart = isHost && participantCount >= 2;
 
+  // navigator.clipboard is blocked inside the Discord activity iframe, so
+  // fall back to the deprecated execCommand path (still works there with a
+  // user gesture), then finally select the code so it can be copied manually.
   const handleCopyCode = async () => {
     if (!roomCode) return;
+    let didCopy = false;
     try {
       await navigator.clipboard.writeText(roomCode);
+      didCopy = true;
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = roomCode;
+      Object.assign(textarea.style, { position: "fixed", opacity: "0" });
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        didCopy = document.execCommand("copy");
+      } catch {
+        didCopy = false;
+      } finally {
+        textarea.remove();
+      }
+    }
+    if (didCopy) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API not available; ignore silently.
-    }
-  };
-
-  const handleShareInvite = async () => {
-    if (!roomCode) return;
-    setShareError(null);
-    // The SDK only exists after OAuth completes — and stays null if init
-    // failed. Retry init on click so one transient failure doesn't
-    // permanently kill the button.
-    const sdk = getDiscordSdk() ?? (await initDiscordClient());
-    if (!sdk) {
-      setShareError("Discord isn't connected — see the console for details.");
       return;
     }
-    try {
-      await sdk.commands.shareLink({
-        message: DISCORD_CONFIG.shareMessage,
-        custom_id: `${DISCORD_CONFIG.roomCodePrefix}${roomCode}`,
-      });
-    } catch (error) {
-      console.error("[discord] shareLink failed:", error);
-      setShareError("Couldn't open the Discord share dialog.");
-    }
+    const selection = window.getSelection();
+    if (!codeRef.current || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(codeRef.current);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    setCopyFailed(true);
+    setTimeout(() => setCopyFailed(false), 4000);
   };
 
   return (
@@ -186,22 +187,17 @@ export function LobbyScreen({
                 title="Click to copy"
                 className={cx(INPUT_BASE, "inline-flex items-center gap-3 px-5 py-2 cursor-pointer hover:border-ui-cyan")}
               >
-                <span className="text-4xl font-bold tracking-[0.3em] pl-[0.3em] text-ui-yellow">
+                <span
+                  ref={codeRef}
+                  className="text-4xl font-bold tracking-[0.3em] pl-[0.3em] text-ui-yellow"
+                >
                   {roomCode}
                 </span>
-                <Label>{copied ? "Copied!" : "Copy"}</Label>
+                <Label>
+                  {copied ? "Copied!" : copyFailed ? "Ctrl+C" : "Copy"}
+                </Label>
               </button>
             </div>
-
-            {/* Discord invite — only shown inside the Activity */}
-            {isDiscordActivity() && (
-              <>
-                <Button block variant="discord" onClick={handleShareInvite}>
-                  Share invite on Discord
-                </Button>
-                {shareError && <ErrorText>{shareError}</ErrorText>}
-              </>
-            )}
 
             {/* Player list */}
             <div>
