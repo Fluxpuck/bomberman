@@ -174,7 +174,14 @@ export function startGuestView(payload: StartPayload, spectator = false) {
   }
 
   // Capture keyboard input and send it to the host. Spectators never send
-  // input, so they get no listener at all.
+  // input, so they get no listener at all. Remove a stale listener first:
+  // when the host restarts while this guest is still on the end screen, the
+  // previous cleanup was never invoked and a second listener would send two
+  // moves per key press.
+  if (removeKeyboardListener) {
+    removeKeyboardListener();
+    removeKeyboardListener = null;
+  }
   removeKeyboardListener = spectator ? null : setupKeyboardInput();
 }
 
