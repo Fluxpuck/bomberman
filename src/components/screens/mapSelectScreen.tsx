@@ -57,10 +57,10 @@ function MapPreview({ pattern }: { pattern: MapPattern }) {
 export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
   return (
     <Screen>
-      <Panel width={460}>
+      <Panel width={720}>
         <Heading title="SELECT MAP" subtitle="Breakable blocks are placed randomly each game" />
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
           {MAP_PATTERNS.map((pattern) => (
             <Button
               key={pattern.id}
@@ -73,10 +73,12 @@ export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
               <span className="font-bold text-sm">{pattern.name}</span>
             </Button>
           ))}
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <Button
             variant="card"
-            className="col-span-2 flex-row!"
+            className="flex-row!"
             style={{ paddingBlock: 10 }}
             onClick={() => onSelect("random")}
           >
@@ -86,7 +88,7 @@ export function MapSelectScreen({ onSelect, onBack }: MapSelectScreenProps) {
 
           <Button
             variant="card"
-            className="col-span-2 flex-row!"
+            className="flex-row!"
             style={{ paddingBlock: 10 }}
             onClick={() => onSelect("generate")}
           >

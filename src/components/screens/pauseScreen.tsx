@@ -8,14 +8,14 @@ interface PauseScreenProps {
 export function PauseScreen({ onReturnToMenu, onResume }: PauseScreenProps) {
   return (
     <Screen>
-      <Panel width={400}>
+      <Panel width={460}>
         <Heading title="PAUSED" subtitle="Game is currently paused" tone="cyan" />
 
-        <div className="flex flex-col gap-4">
-          <Button block variant="green" size="lg" onClick={onResume}>
+        <div className="grid grid-cols-2 gap-4">
+          <Button variant="green" size="lg" onClick={onResume}>
             Resume Game
           </Button>
-          <Button block variant="neutral" onClick={onReturnToMenu}>
+          <Button variant="neutral" size="lg" onClick={onReturnToMenu}>
             Main Menu
           </Button>
         </div>

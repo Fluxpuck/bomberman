@@ -110,7 +110,7 @@ export function LobbyScreen({
 
   return (
     <Screen>
-      <Panel width={440}>
+      <Panel width={inRoom ? 720 : 440}>
         <Heading
           title="MULTIPLAYER"
           subtitle={inRoom ? "Room lobby" : "Create or join a room"}
@@ -195,50 +195,55 @@ export function LobbyScreen({
               </button>
             </div>
 
-            {/* Player list */}
-            <div>
-              <Label className="block mb-2">Players ({players.length}/4)</Label>
-              <div className="flex flex-col gap-2">
-                {players.map((p) => (
-                  <div
-                    key={p.slot}
-                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.04] border border-[rgba(124,196,255,.14)]"
-                  >
-                    <span className="flex items-center gap-2 font-bold">
-                      <Dot color={SLOT_COLORS[p.slot % SLOT_COLORS.length]} />
-                      {p.name}
-                      {p.isHost && (
-                        <Label className="text-ui-yellow!">Host</Label>
-                      )}
-                    </span>
-                    <Label>Slot {p.slot + 1}</Label>
+            {/* Roster on the left, controls on the right — keeps the panel
+                landscape instead of one tall column. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
+              <div className="flex flex-col gap-4">
+                {/* Player list */}
+                <div>
+                  <Label className="block mb-2">Players ({players.length}/4)</Label>
+                  <div className="flex flex-col gap-2">
+                    {players.map((p) => (
+                      <div
+                        key={p.slot}
+                        className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.04] border border-[rgba(124,196,255,.14)]"
+                      >
+                        <span className="flex items-center gap-2 font-bold">
+                          <Dot color={SLOT_COLORS[p.slot % SLOT_COLORS.length]} />
+                          {p.name}
+                          {p.isHost && (
+                            <Label className="text-ui-yellow!">Host</Label>
+                          )}
+                        </span>
+                        <Label>Slot {p.slot + 1}</Label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Spectator list */}
-            {spectators.length > 0 && (
-              <div>
-                <Label className="block mb-2">
-                  Spectators ({spectators.length}/{NET_CONFIG.maxSpectators})
-                </Label>
-                <div className="flex flex-col gap-2">
-                  {spectators.map((s, i) => (
-                    <div
-                      key={`${s.name}-${i}`}
-                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.04] border border-[rgba(124,196,255,.14)]"
-                    >
-                      <span className="flex items-center gap-2 font-bold">
-                        <Dot color="#94a3b8" />
-                        {s.name}
-                      </span>
-                      <Label>Watching</Label>
-                    </div>
-                  ))}
                 </div>
+
+                {/* Spectator list */}
+                {spectators.length > 0 && (
+                  <div>
+                    <Label className="block mb-2">
+                      Spectators ({spectators.length}/{NET_CONFIG.maxSpectators})
+                    </Label>
+                    <div className="flex flex-col gap-2">
+                      {spectators.map((s, i) => (
+                        <div
+                          key={`${s.name}-${i}`}
+                          className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.04] border border-[rgba(124,196,255,.14)]"
+                        >
+                          <span className="flex items-center gap-2 font-bold">
+                            <Dot color="#94a3b8" />
+                            {s.name}
+                          </span>
+                          <Label>Watching</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
 
             {/* Host controls */}
             {isHost ? (
@@ -297,6 +302,7 @@ export function LobbyScreen({
                 </Button>
               </div>
             )}
+            </div>
           </div>
         )}
 

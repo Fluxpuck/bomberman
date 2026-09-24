@@ -52,7 +52,7 @@ export function EndScreen({
 
   return (
     <Screen>
-      <Panel width={multiPlayerStats ? 680 : 448}>
+      <Panel width={multiPlayerStats ? 780 : 640}>
         <Heading
           title={isWin ? "VICTORY!" : "GAME OVER"}
           tone={isWin ? "green" : "red"}
@@ -65,7 +65,15 @@ export function EndScreen({
           </div>
         )}
 
-        <div className="flex flex-col gap-4 mb-6">
+        {/* Game stats on the left, player cards on the right — keeps the
+            panel landscape instead of one tall column. */}
+        <div
+          className={
+            multiPlayerStats
+              ? "grid grid-cols-1 sm:grid-cols-[2fr_3fr] gap-4 mb-6 items-start"
+              : "grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 items-start"
+          }
+        >
           <Section title="Game Statistics">
             <StatRow label="Time Played" value={formatTime(timePlayed)} />
             <StatRow label="Bombs Placed" value={gameStats.totalBombsPlaced} />
@@ -76,7 +84,7 @@ export function EndScreen({
           <div
             className={
               multiPlayerStats
-                ? "grid grid-cols-1 sm:grid-cols-2 gap-4"
+                ? "grid sm:grid-cols-2 gap-4"
                 : "flex flex-col gap-4"
             }
           >
