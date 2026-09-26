@@ -159,7 +159,6 @@ const TITLE_TILES: TileKind[] = [
 ];
 
 const MODE_BUTTONS = [
-  { text: "Solo", bg: "#4ade80", border: "#166534", color: "#0a0a0a" },
   { text: "2 Players", bg: "#60a5fa", border: "#1e3a8a", color: "#fff" },
   { text: "3 Players", bg: "#f59e0b", border: "#b45309", color: "#fff" },
   { text: "4 Players", bg: "#ef4444", border: "#991b1b", color: "#fff" },

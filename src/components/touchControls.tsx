@@ -13,7 +13,7 @@ interface TouchControlsProps {
 // Repeat cadence while a direction button is held down.
 const MOVE_REPEAT_MS = 160;
 
-const isTouchDevice = (): boolean => {
+export const isTouchDevice = (): boolean => {
   if (typeof window === "undefined") return false;
   return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };

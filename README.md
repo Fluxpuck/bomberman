@@ -31,8 +31,8 @@ friends through rooms, invite links, or a Discord Activity.
   <img src="public/marketing/bomb-blast-arena-title-1920x1080.png" alt="Bomb Blast Arena title screen" width="600" />
 </div>
 
-Pick a mode — **Solo**, **2–4 Players**, or **Multiplayer (Online)** — and
-outlast everyone else in the arena.
+Pick a mode — **2–4 Players** (you versus AI bots) or **Multiplayer
+(Online)** — and outlast everyone else in the arena.
 
 | Action        | Keys                    |
 | ------------- | ----------------------- |

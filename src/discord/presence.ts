@@ -40,8 +40,6 @@ function modeLabel(gameMode: GameMode): string {
   switch (gameMode) {
     case "online":
       return "Online match";
-    case "solo":
-      return "Solo match";
     default:
       return "Local match";
   }

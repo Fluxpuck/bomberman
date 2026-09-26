@@ -33,4 +33,4 @@ export enum GameState {
   WIN = "WIN",
 }
 
-export type GameMode = "solo" | "2 players" | "3 players" | "4 players" | "online";
+export type GameMode = "2 players" | "3 players" | "4 players" | "online";

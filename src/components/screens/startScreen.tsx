@@ -7,7 +7,8 @@ import {
 } from "react";
 import { GameMode } from "../../types/game";
 import { Bomb, Bomber, Tile, type TileKind } from "../sprites";
-import { Button, type ButtonVariant } from "../ui";
+import { isTouchDevice } from "../touchControls";
+import { Button, cx, type ButtonVariant } from "../ui";
 
 interface StartScreenProps {
   onStart: (mode: GameMode) => void;
@@ -19,14 +20,13 @@ const PIXEL = "'Courier New', Courier, monospace";
 
 // Button colour per game mode
 const modeVariant: Record<GameMode, ButtonVariant> = {
-  solo: "green",
   "2 players": "blue",
   "3 players": "orange",
   "4 players": "red",
   online: "purple",
 };
 
-const gameModes: GameMode[] = ["solo", "2 players", "3 players", "4 players"];
+const gameModes: GameMode[] = ["2 players", "3 players", "4 players"];
 
 const BLUE = { accent: "#60a5fa", dark: "#1e3a8a", light: "#cfe8ff" };
 const RED = { accent: "#ef4444", dark: "#991b1b", light: "#ffd3cf" };
@@ -46,42 +46,79 @@ const TILE_ROWS = 3;
 const MIN_MENU_SCALE = 0.5;
 const MENU_BOTTOM_MARGIN = 12;
 
-/**
- * Layout unit: 1 = the 1920x1080 design artboard. Bound by height, and by
- * width against the title lockup (~1300 design px wide) so it never overflows.
- */
-function useUnit(): number | null {
-  const [u, setU] = useState<number | null>(null);
+interface Viewport {
+  /** 1 = the 1920x1080 design artboard. Bound by height, and by width
+   *  against the title lockup (~1300 design px wide) so it never overflows. */
+  u: number;
+  width: number;
+  height: number;
+  /** Below the sm breakpoint and taller than wide: phones held upright get
+   *  their own stacked-title layout instead of the shrunk landscape one. */
+  mobilePortrait: boolean;
+  /** sm and up, portrait: same layout as landscape, just centred and with
+   *  touch-friendly button sizing instead of the shrink-to-fit scale. */
+  portrait: boolean;
+}
+
+function useViewport(): Viewport | null {
+  const [vp, setVp] = useState<Viewport | null>(null);
   useEffect(() => {
-    const update = () =>
-      setU(Math.min(window.innerHeight / 1080, window.innerWidth / 1300));
+    const update = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const portrait = height > width;
+      setVp({
+        u: Math.min(height / 1080, width / 1300),
+        width,
+        height,
+        portrait,
+        mobilePortrait: portrait && width < 640,
+      });
+    };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
-  return u;
+  return vp;
 }
+
+const isTouch = isTouchDevice();
+
+// Fixed touch-target metrics for the mobile-portrait button grid — large
+// enough to tap reliably regardless of how small the phone is.
+const TOUCH_BUTTON_STYLE = {
+  "--bw": "3px",
+  "--depth": "5px",
+  "--btn-py": "11px",
+  "--btn-fs": "16px",
+  borderRadius: 10,
+} as CSSProperties;
 
 function Abs({ style, children }: { style: CSSProperties; children: ReactNode }) {
   return <div style={{ position: "absolute", ...style }}>{children}</div>;
 }
 
 export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
-  const u = useUnit();
+  const vp = useViewport();
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuScale, setMenuScale] = useState(1);
 
-  // Fit the measured menu column inside the viewport below its top offset.
+  // Fit the measured menu column inside its available space. Landscape (and
+  // tablet portrait) anchor the column near the top, so the budget is the
+  // viewport below that offset; mobile portrait centres it in the band above
+  // the tile strip, so the budget is the band's own height.
   // offsetTop/offsetHeight are layout values, so the transform itself never
   // feeds back into the measurement.
   useEffect(() => {
     const update = () => {
       const el = menuRef.current;
       if (!el) return;
-      const fit =
-        (window.innerHeight - el.offsetTop - MENU_BOTTOM_MARGIN) /
-        el.offsetHeight;
-      setMenuScale(Math.min(1, Math.max(MIN_MENU_SCALE, fit)));
+      const portraitNow = window.innerHeight > window.innerWidth;
+      const budget =
+        portraitNow && window.innerWidth < 640
+          ? window.innerHeight - 132 * Math.min(window.innerHeight / 844, window.innerWidth / 390)
+          : window.innerHeight - el.offsetTop;
+      setMenuScale(Math.min(1, Math.max(MIN_MENU_SCALE, (budget - MENU_BOTTOM_MARGIN) / el.offsetHeight)));
     };
     update();
     window.addEventListener("resize", update);
@@ -92,18 +129,20 @@ export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
       window.removeEventListener("resize", update);
       observer.disconnect();
     };
-  }, [u]);
+  }, [vp]);
 
   // Measure before painting so the layout doesn't jump from a default size.
-  if (u === null) return <div className="fixed inset-0 z-50" />;
+  if (vp === null) return <div className="fixed inset-0 z-50" />;
+  const { u, width, height, portrait, mobilePortrait } = vp;
 
-  const wide = typeof window !== "undefined" && window.innerWidth >= 700;
+  const wide = width >= 700;
   const tile = 120 * u;
   const tileGap = 4;
-  const tileCols =
-    Math.ceil((typeof window !== "undefined" ? window.innerWidth : 1920) / (tile + tileGap)) + 1;
+  const tileCols = Math.ceil(width / (tile + tileGap)) + 1;
 
   // Size the shared button to the layout unit (see BUTTON_BASE in ui.tsx).
+  // Tablet portrait uses the shared "lg" size and mobile portrait a fixed
+  // touch-target size instead, both per the PROPOSED responsive spec.
   const buttonSize = {
     "--bw": `${Math.max(2, 4 * u)}px`,
     "--depth": `${Math.max(3, 6 * u)}px`,
@@ -161,86 +200,119 @@ export function StartScreen({ onStart, onMultiplayer }: StartScreenProps) {
         />
       </div>
 
-      {/* Title + menu */}
+      {/* Title + menu: landscape and tablet-portrait anchor near the top and
+          scale with the layout unit; mobile portrait centres a stacked title
+          in the band above the tile strip with fixed touch-size buttons. */}
       <div
-        ref={menuRef}
         className="absolute inset-x-0 flex flex-col items-center"
-        style={{
-          top: 60 * u,
-          gap: Math.max(10, 26 * u),
-          transform: `scale(${menuScale})`,
-          transformOrigin: "50% 0",
-        }}
+        style={
+          portrait
+            ? {
+                top: 0,
+                bottom: mobilePortrait ? 132 * Math.min(height / 844, width / 390) : 340 * u,
+                justifyContent: "center",
+              }
+            : { top: 60 * u }
+        }
       >
-        <h1
-          className="text-center whitespace-nowrap"
+        <div
+          ref={menuRef}
+          className="flex flex-col items-center"
           style={{
-            fontFamily: BUNGEE,
-            fontSize: 158 * u,
-            lineHeight: 0.82,
-            color: "#ffce3d",
-            textShadow: `0 ${10 * u}px 0 #a8410c, 0 0 ${90 * u}px rgba(255,154,43,.5)`,
+            gap: mobilePortrait ? 14 : Math.max(10, 26 * u),
+            transform: `scale(${menuScale})`,
+            transformOrigin: portrait ? "50% 50%" : "50% 0",
           }}
         >
-          BOMB BLAST
-        </h1>
-        <div className="flex items-center" style={{ gap: 26 * u }}>
-          <div style={{ height: Math.max(3, 7 * u), width: 150 * u, background: "#5fd7f2", borderRadius: 4 }} />
-          <div
+          <h1
+            className={cx("text-center", !mobilePortrait && "whitespace-nowrap")}
             style={{
               fontFamily: BUNGEE,
-              fontSize: 76 * u,
-              color: "#5fd7f2",
-              letterSpacing: ".26em",
-              marginRight: "-.26em",
+              fontSize: mobilePortrait ? 84 : 158 * u,
+              lineHeight: 0.82,
+              color: "#ffce3d",
+              textShadow: mobilePortrait
+                ? "0 6px 0 #a8410c, 0 0 44px rgba(255,154,43,.5)"
+                : `0 ${10 * u}px 0 #a8410c, 0 0 ${90 * u}px rgba(255,154,43,.5)`,
             }}
           >
-            ARENA
+            {mobilePortrait ? (
+              <>
+                BOMB
+                <br />
+                BLAST
+              </>
+            ) : (
+              "BOMB BLAST"
+            )}
+          </h1>
+          <div className="flex items-center" style={{ gap: mobilePortrait ? 12 : 26 * u }}>
+            <div style={{ height: mobilePortrait ? 4 : Math.max(3, 7 * u), width: mobilePortrait ? 40 : 150 * u, background: "#5fd7f2", borderRadius: 4 }} />
+            <div
+              style={{
+                fontFamily: BUNGEE,
+                fontSize: mobilePortrait ? 32 : 76 * u,
+                color: "#5fd7f2",
+                letterSpacing: ".26em",
+                marginRight: "-.26em",
+              }}
+            >
+              ARENA
+            </div>
+            <div style={{ height: mobilePortrait ? 4 : Math.max(3, 7 * u), width: mobilePortrait ? 40 : 150 * u, background: "#5fd7f2", borderRadius: 4 }} />
           </div>
-          <div style={{ height: Math.max(3, 7 * u), width: 150 * u, background: "#5fd7f2", borderRadius: 4 }} />
-        </div>
-        <p
-          className="text-center px-4"
-          style={{ fontSize: Math.max(14, 26 * u), color: "#dbe7f7", letterSpacing: ".02em" }}
-        >
-          Select game mode to start playing.
-        </p>
-
-        <div
-          className="flex flex-col items-center"
-          style={{ gap: Math.max(8, 12 * u), marginTop: 4, width: "min(520px, 92vw)", maxWidth: 520 }}
-        >
-          <div
-            className="grid grid-cols-2 w-full"
-            style={{ gap: Math.max(8, 14 * u) }}
-          >
-            {gameModes.map((mode) => (
-              <Button
-                key={mode}
-                variant={modeVariant[mode]}
-                style={buttonSize}
-                onClick={() => onStart(mode)}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </Button>
-            ))}
-          </div>
-          <Button block variant={modeVariant.online} style={buttonSize} onClick={onMultiplayer}>
-            Multiplayer (Online)
-          </Button>
           <p
-            className="text-center px-2"
-            style={{
-              fontFamily: PIXEL,
-              fontWeight: 700,
-              fontSize: Math.max(12, 18 * u),
-              color: "#a8bcd8",
-              letterSpacing: ".04em",
-              marginTop: 2,
-            }}
+            className="text-center px-4"
+            style={{ fontSize: mobilePortrait ? 15 : Math.max(14, 26 * u), color: "#dbe7f7", letterSpacing: ".02em" }}
           >
-            Controls: WASD keys to move, Space to place bombs
+            Select game mode to start playing.
           </p>
+
+          <div
+            className="flex flex-col items-center"
+            style={{ gap: mobilePortrait ? 8 : Math.max(8, 12 * u), marginTop: 4, width: "min(520px, 92vw)", maxWidth: 520 }}
+          >
+            <div
+              className="grid grid-cols-3 w-full"
+              style={{ gap: mobilePortrait ? 8 : Math.max(8, 14 * u) }}
+            >
+              {gameModes.map((mode) => (
+                <Button
+                  key={mode}
+                  variant={modeVariant[mode]}
+                  size={portrait && !mobilePortrait ? "lg" : undefined}
+                  style={mobilePortrait ? TOUCH_BUTTON_STYLE : portrait ? undefined : buttonSize}
+                  onClick={() => onStart(mode)}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Button>
+              ))}
+            </div>
+            <Button
+              block
+              variant={modeVariant.online}
+              size={portrait && !mobilePortrait ? "lg" : undefined}
+              style={mobilePortrait ? TOUCH_BUTTON_STYLE : portrait ? undefined : buttonSize}
+              onClick={onMultiplayer}
+            >
+              Multiplayer (Online)
+            </Button>
+            <p
+              className="text-center px-2"
+              style={{
+                fontFamily: PIXEL,
+                fontWeight: 700,
+                fontSize: mobilePortrait ? 12 : Math.max(12, 18 * u),
+                color: "#a8bcd8",
+                letterSpacing: ".04em",
+                marginTop: 2,
+              }}
+            >
+              {isTouch
+                ? "Use the on-screen pad to move, \u{1F4A3} to drop bombs"
+                : "Controls: WASD keys to move, Space to place bombs"}
+            </p>
+          </div>
         </div>
       </div>
 

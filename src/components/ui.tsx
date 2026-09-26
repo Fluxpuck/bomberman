@@ -57,7 +57,16 @@ export function Heading({
 }) {
   return (
     <div className="mb-6">
-      <h1 className={cx(TITLE, TITLE_TONE[tone])}>{title}</h1>
+      {/* fontFamily is also set inline (not just via the font-display class)
+          so a page-injected stylesheet redefining a same-named utility class
+          (seen from a browser extension's own `.font-display` reset) can't
+          silently knock the heading back to the default sans fallback. */}
+      <h1
+        className={cx(TITLE, TITLE_TONE[tone])}
+        style={{ fontFamily: "var(--font-bungee), Bungee, sans-serif" }}
+      >
+        {title}
+      </h1>
       {subtitle && (
         <p className="mt-2.5 text-center text-sm text-ui-muted">{subtitle}</p>
       )}

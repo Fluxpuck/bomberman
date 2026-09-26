@@ -71,7 +71,7 @@ import Game from "./game";
 
 export default function Home() {
   // Game state
-  const [gameMode, setGameMode] = useState<GameMode>("solo");
+  const [gameMode, setGameMode] = useState<GameMode>("2 players");
   const [gameState, setGameState] = useState<GameState>(GameState.START);
   const [timeElapsedMs, setTimeElapsedMs] = useState(0);
   const [winner, setWinner] = useState<PlayerStats | undefined>(undefined);
@@ -109,7 +109,7 @@ export default function Home() {
 
   // Pending start params held while the map-select screen is shown. The
   // online entry carries the host's "fill bots" choice; null = local game.
-  const pendingModeRef = useRef<GameMode>("solo");
+  const pendingModeRef = useRef<GameMode>("2 players");
   const pendingOnlineFillBotsRef = useRef<boolean | null>(null);
 
   // Discord Activity state: the room code carried by a shareLink invite
@@ -431,9 +431,6 @@ export default function Home() {
     tracker.startGame();
 
     switch (mode) {
-      case "solo":
-        setDesiredPlayersCount(1);
-        break;
       case "2 players":
         setDesiredPlayersCount(2);
         break;
@@ -444,7 +441,7 @@ export default function Home() {
         setDesiredPlayersCount(4);
         break;
       default:
-        setDesiredPlayersCount(1);
+        setDesiredPlayersCount(2);
     }
   };
 
@@ -507,7 +504,7 @@ export default function Home() {
         error: relayConnectError,
       }));
       setIsGuest(false);
-      setGameMode("solo");
+      setGameMode("2 players");
     }
   };
 

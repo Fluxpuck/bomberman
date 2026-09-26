@@ -11,7 +11,7 @@ export function PauseScreen({ onReturnToMenu, onResume }: PauseScreenProps) {
       <Panel width={460}>
         <Heading title="PAUSED" subtitle="Game is currently paused" tone="cyan" />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Button variant="green" size="lg" onClick={onResume}>
             Resume Game
           </Button>

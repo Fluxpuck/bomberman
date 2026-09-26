@@ -49,6 +49,9 @@ export function EndScreen({
   // lobby doesn't stretch the panel off-screen. Regular players only ever
   // see their own single card.
   const multiPlayerStats = (players?.length ?? 0) > 1;
+  // Spectator game-over: compact 2-up cards so mobile fits without the
+  // Screen wrapper shrinking the whole panel down to fit.
+  const spectatorLayout = multiPlayerStats && !isWin;
 
   return (
     <Screen>
@@ -75,16 +78,18 @@ export function EndScreen({
           }
         >
           <Section title="Game Statistics">
-            <StatRow label="Time Played" value={formatTime(timePlayed)} />
-            <StatRow label="Bombs Placed" value={gameStats.totalBombsPlaced} />
-            <StatRow label="Blocks Destroyed" value={gameStats.totalBlocksDestroyed} />
-            <StatRow label="Total Kills" value={gameStats.totalKills} />
+            <div className={spectatorLayout ? "grid grid-cols-2 sm:block gap-x-4" : "contents"}>
+              <StatRow label="Time Played" value={formatTime(timePlayed)} />
+              <StatRow label="Bombs Placed" value={gameStats.totalBombsPlaced} />
+              <StatRow label="Blocks Destroyed" value={gameStats.totalBlocksDestroyed} />
+              <StatRow label="Total Kills" value={gameStats.totalKills} />
+            </div>
           </Section>
 
           <div
             className={
               multiPlayerStats
-                ? "grid sm:grid-cols-2 gap-4"
+                ? "grid grid-cols-2 gap-4"
                 : "flex flex-col gap-4"
             }
           >
@@ -92,8 +97,10 @@ export function EndScreen({
               <Section key={player.id} title={`${player.name} Stats`} dotColor={player.color}>
                 <StatRow label="Score" value={player.score} />
                 <StatRow label="Lives Left" value={player.lives} />
-                <StatRow label="Bombs Placed" value={player.bombsPlaced} />
-                <StatRow label="Blocks Destroyed" value={player.blocksDestroyed} />
+                <div className={spectatorLayout ? "hidden sm:contents" : "contents"}>
+                  <StatRow label="Bombs Placed" value={player.bombsPlaced} />
+                  <StatRow label="Blocks Destroyed" value={player.blocksDestroyed} />
+                </div>
                 <StatRow label="Kills" value={player.kills} />
               </Section>
             ))}
